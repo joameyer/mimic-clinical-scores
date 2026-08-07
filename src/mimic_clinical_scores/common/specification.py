@@ -38,6 +38,9 @@ class ScoreSpecification(Protocol):
     item_manifest_version: str
     output_granularity: str
     primary_key_columns: tuple[str, ...]
+    requires_outtime: bool
+    hour_index_column: str
+    maximum_hour_index: int
 
     def vendor_root(self, project_root: Path) -> Path: ...
 

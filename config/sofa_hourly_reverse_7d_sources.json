@@ -1,0 +1,31 @@
+{
+  "score": "discharge-relative hourly SOFA over the final seven ICU days",
+  "adaptation_version": "sofa-hourly-reverse-7d-v1",
+  "mimic_code": {
+    "repository": "https://github.com/MIT-LCP/mimic-code.git",
+    "release": "v3.0.1",
+    "commit": "c7e07560dc847e32cbb0b2890213e8e7cbd8bc7e"
+  },
+  "official_hourly_sofa": {
+    "path": "mimic-iv/concepts_duckdb/score/sofa.sql",
+    "sha256": "5af9c75bdaeb9342138a0fbc8cbef33b132508689e3ac492ab574af1c7ff05b0"
+  },
+  "adaptations": [
+    {
+      "id": "discharge-relative-grid",
+      "description": "Index 0 is (outtime-1h,outtime], increasing backward to at most 167; the earliest interval is partial for stays whose duration is not an integer number of hours."
+    },
+    {
+      "id": "null-outtime-exclusion",
+      "description": "A reverse trajectory is undefined without raw ICU outtime. Such stays are counted and excluded rather than assigned an invented discharge time."
+    },
+    {
+      "id": "outcome-annotation",
+      "description": "All eligible stays are scored without outcome filtering, then raw admissions death time and hospital expiry status are attached for dead/alive analyses."
+    },
+    {
+      "id": "explicit-component-missingness",
+      "description": "Nullable rolling components are retained while the upstream zero-filled total is preserved."
+    }
+  ]
+}

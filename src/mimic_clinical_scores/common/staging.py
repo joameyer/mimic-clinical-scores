@@ -196,6 +196,66 @@ def _filter_sql(
                   AND raw.endtime > c.intime - INTERVAL '24' HOUR
             )
         """
+    elif specification.name == "sofa_hourly_reverse_7d" and qualified_table == "mimiciv_icu.chartevents":
+        all_ids = specification.item_ids(qualified_table)
+        full_context_ids = specification.full_context_item_ids(qualified_table)
+        predicate = f"""
+            raw.itemid IN ({_id_list(all_ids)})
+            AND EXISTS (
+                SELECT 1 FROM pipeline_meta.cohort_context c
+                WHERE c.stay_id = raw.stay_id
+                  AND c.outtime IS NOT NULL
+                  AND (
+                    raw.itemid IN ({_id_list(full_context_ids)})
+                    OR (
+                      raw.itemid NOT IN ({_id_list(full_context_ids)})
+                      AND raw.charttime > GREATEST(
+                        c.intime, c.outtime - INTERVAL '168' HOUR
+                      ) - INTERVAL '24' HOUR
+                      AND raw.charttime <= c.outtime
+                    )
+                  )
+            )
+        """
+    elif specification.name == "sofa_hourly_reverse_7d" and qualified_table == "mimiciv_hosp.labevents":
+        predicate = f"""
+            raw.itemid IN ({_id_list(specification.item_ids(qualified_table))})
+            AND EXISTS (
+                SELECT 1 FROM pipeline_meta.cohort_context c
+                WHERE c.hadm_id = raw.hadm_id
+                  AND c.outtime IS NOT NULL
+                  AND raw.charttime > GREATEST(
+                    c.intime, c.outtime - INTERVAL '168' HOUR
+                  ) - INTERVAL '24' HOUR
+                  AND raw.charttime <= c.outtime
+            )
+        """
+    elif specification.name == "sofa_hourly_reverse_7d" and qualified_table == "mimiciv_icu.inputevents":
+        predicate = f"""
+            raw.itemid IN ({_id_list(specification.item_ids(qualified_table))})
+            AND EXISTS (
+                SELECT 1 FROM pipeline_meta.cohort_context c
+                WHERE c.stay_id = raw.stay_id
+                  AND c.outtime IS NOT NULL
+                  AND raw.starttime < c.outtime
+                  AND raw.endtime > GREATEST(
+                    c.intime, c.outtime - INTERVAL '168' HOUR
+                  ) - INTERVAL '24' HOUR
+            )
+        """
+    elif specification.name == "sofa_hourly_reverse_7d" and qualified_table == "mimiciv_icu.outputevents":
+        predicate = f"""
+            raw.itemid IN ({_id_list(specification.item_ids(qualified_table))})
+            AND EXISTS (
+                SELECT 1 FROM pipeline_meta.cohort_context c
+                WHERE c.stay_id = raw.stay_id
+                  AND c.outtime IS NOT NULL
+                  AND raw.charttime > GREATEST(
+                    c.intime, c.outtime - INTERVAL '168' HOUR
+                  ) - INTERVAL '48' HOUR
+                  AND raw.charttime <= c.outtime
+            )
+        """
     elif specification.name == "sofa_hourly_14d" and qualified_table == "mimiciv_icu.chartevents":
         all_ids = specification.item_ids(qualified_table)
         full_context_ids = specification.full_context_item_ids(qualified_table)

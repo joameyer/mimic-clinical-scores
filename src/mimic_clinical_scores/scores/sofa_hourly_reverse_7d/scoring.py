@@ -25,17 +25,16 @@ def scores_projection_sql() -> str:
           s.rate_epinephrine, s.rate_norepinephrine,
           s.rate_dopamine, s.rate_dobutamine, s.meanbp_min, s.gcs_min,
           s.uo_24hr, s.bilirubin_max, s.creatinine_max, s.platelet_min,
-          a.deathtime, a.hospital_expire_flag,
-          (a.deathtime IS NOT NULL AND a.deathtime <= i.outtime)
+          s.deathtime, s.hospital_expire_flag,
+          (s.deathtime IS NOT NULL AND s.deathtime <= i.outtime)
             AS death_recorded_by_icu_discharge,
-          (a.deathtime IS NOT NULL AND a.deathtime >= i.intime AND a.deathtime <= i.outtime)
+          (s.deathtime IS NOT NULL AND s.deathtime >= i.intime AND s.deathtime <= i.outtime)
             AS died_during_icu_stay,
-          NOT (a.deathtime IS NOT NULL AND a.deathtime <= i.outtime)
+          NOT (s.deathtime IS NOT NULL AND s.deathtime <= i.outtime)
             AS alive_at_icu_discharge,
           'sofa-hourly-reverse-7d-v1' AS adaptation_version
         FROM {TABLE} s
         JOIN mimiciv_icu.icustays i USING (stay_id)
-        JOIN mimiciv_hosp.admissions a USING (hadm_id)
         ORDER BY s.stay_id, s.hours_before_discharge
     """
 

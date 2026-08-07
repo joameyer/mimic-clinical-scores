@@ -150,6 +150,13 @@ def calculate_coverage(
     if getattr(specification, "output_granularity", "stay") == "stay_hour":
         overall["score_rows"] = overall.pop("cohort_rows")
         overall["cohort_stays"] = total_cohort
+        overall["scored_stays"] = int(
+            connection.execute(
+                f"SELECT COUNT(DISTINCT stay_id) FROM {specification.score_table}"
+            ).fetchone()[0]
+        )
+        if getattr(specification, "requires_outtime", False):
+            overall["excluded_stays_without_usable_outtime"] = total_cohort - overall["scored_stays"]
     else:
         overall["cohort_rows"] = total_cohort
     stratified = {
@@ -346,24 +353,36 @@ def validate_exports(
         raise ExportError("score_missingness.parquet row count differs from scores.parquet")
 
     if hourly:
+        hour_column = getattr(specification, "hour_index_column", "hour_index")
+        maximum_hour = int(getattr(specification, "maximum_hour_index", 335))
+        eligible_stays = int(
+            connection.execute(
+                "SELECT COUNT(*) FROM mimiciv_icu.icustays "
+                + (
+                    "WHERE outtime IS NOT NULL AND outtime > intime"
+                    if getattr(specification, "requires_outtime", False)
+                    else ""
+                )
+            ).fetchone()[0]
+        )
         score_counts = connection.execute(
             f"""
             SELECT COUNT(*), COUNT(DISTINCT stay_id),
-                   COUNT(*) FILTER (WHERE stay_id IS NULL OR hour_index IS NULL),
-                   COUNT(*) - COUNT(DISTINCT (stay_id, hour_index))
+                   COUNT(*) FILTER (WHERE stay_id IS NULL OR {hour_column} IS NULL),
+                   COUNT(*) - COUNT(DISTINCT (stay_id, {hour_column}))
             FROM read_parquet({_literal(str(scores_path.resolve()))})
             """
         ).fetchone()
-        if score_counts != (expected_rows, cohort_rows, 0, 0):
+        if score_counts != (expected_rows, eligible_stays, 0, 0):
             raise ExportError(f"Invalid hourly score identifiers: {score_counts}")
         invalid_grid = connection.execute(
             f"""
             SELECT COUNT(*) FROM (
-              SELECT stay_id, MIN(hour_index) AS min_hr, MAX(hour_index) AS max_hr,
+              SELECT stay_id, MIN({hour_column}) AS min_hr, MAX({hour_column}) AS max_hr,
                      COUNT(*) AS rows
               FROM read_parquet({_literal(str(scores_path.resolve()))})
               GROUP BY stay_id
-              HAVING min_hr <> 0 OR max_hr > 335 OR rows <> max_hr + 1
+              HAVING min_hr <> 0 OR max_hr > {maximum_hour} OR rows <> max_hr + 1
             ) invalid
             """
         ).fetchone()[0]
@@ -378,14 +397,19 @@ def validate_exports(
         ).fetchone()
         if score_counts != (cohort_rows, cohort_rows, 0):
             raise ExportError(f"Invalid score identifiers: {score_counts}")
+    expected_stay_query = (
+        "SELECT stay_id FROM mimiciv_icu.icustays WHERE outtime IS NOT NULL AND outtime > intime"
+        if hourly and getattr(specification, "requires_outtime", False)
+        else "SELECT stay_id FROM pipeline_meta.cohort"
+    )
     mismatch = connection.execute(
         f"""
         SELECT COUNT(*) FROM (
-          (SELECT stay_id FROM pipeline_meta.cohort
+          ({expected_stay_query}
            EXCEPT SELECT stay_id FROM read_parquet({_literal(str(scores_path.resolve()))}))
           UNION ALL
           (SELECT stay_id FROM read_parquet({_literal(str(scores_path.resolve()))})
-           EXCEPT SELECT stay_id FROM pipeline_meta.cohort)
+           EXCEPT {expected_stay_query})
         ) differences
         """
     ).fetchone()[0]
@@ -394,9 +418,12 @@ def validate_exports(
     result = {"valid": True, "cohort_rows": cohort_rows, "checked_outputs": list(required)}
     if hourly:
         result["score_rows"] = expected_rows
+        if getattr(specification, "requires_outtime", False):
+            result["scored_stays"] = eligible_stays
+            result["excluded_stays"] = cohort_rows - eligible_stays
         result["maximum_hour_index"] = int(
             connection.execute(
-                f"SELECT MAX(hour_index) FROM read_parquet({_literal(str(scores_path.resolve()))})"
+                f"SELECT MAX({hour_column}) FROM read_parquet({_literal(str(scores_path.resolve()))})"
             ).fetchone()[0]
         )
     return result
