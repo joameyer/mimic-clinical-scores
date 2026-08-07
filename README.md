@@ -64,6 +64,10 @@ adaptations, time windows, source mapping, missingness semantics, and cluster co
 are documented in the [SOFA audit](docs/scores/sofa_first_day_adapted.md). Classic
 SOFA has no direct mortality-probability output.
 
+After a completed SOFA run, `scripts/audit_sofa_respiratory_missingness.py` provides an
+identifier-free breakdown of absent PaO2, absent valid FiO2 pairing, ventilation
+status, ICU-duration strata, and charted-FiO2 fallback age.
+
 ## SAPS III adapted
 
 MIT-LCP/mimic-code v3.0.1 contains no SAPS III concept, so this project does not call

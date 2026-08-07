@@ -1,15 +1,18 @@
-# SAPS II and SAPS III adapted in MIMIC-IV 3.1
+# SAPS II, SAPS III adapted, and classic SOFA adapted in MIMIC-IV 3.1
 
 ## Purpose and scope
 
-This document describes the two ICU severity-score outputs produced by this repository:
+This document describes the three ICU severity-score outputs produced by this repository:
 
-- a self-computed SAPS II that executes pinned official MIT-LCP/mimic-code SQL; and
+- a self-computed SAPS II that executes pinned official MIT-LCP/mimic-code SQL;
 - a project-owned `saps_iii_adapted` score that preserves the published SAPS III point
   model while explicitly approximating variables that cannot be recovered faithfully
-  from structured MIMIC-IV.
+  from structured MIMIC-IV; and
+- a project-owned `sofa_first_day_adapted` score based on the pinned MIT-LCP classic
+  first-day SOFA concept with an explicit correction to its ventilated respiratory
+  categories and equivalent narrow first-day aggregates.
 
-Both full outputs contain exactly one row for each of the same 94,458 MIMIC-IV ICU
+All three full outputs contain exactly one row for each of the same 94,458 MIMIC-IV ICU
 stays. The ordered cohort hashes match, every `stay_id` is unique and non-null, and the
 score and missingness files have identical membership. The unit of analysis is the ICU
 stay, not the patient or hospital admission. A patient with multiple ICU stays can
@@ -20,19 +23,19 @@ MIMIC-derived data. The statistics below are aggregate and contain no identifier
 
 ## At-a-glance comparison
 
-| Property | SAPS II | SAPS III adapted |
-|---|---|---|
-| Output label | `sapsii_official`, `sapsii_prob_official` | `saps_iii_adapted`, global and North American adapted probabilities |
-| Status | Self-computed from raw MIMIC-IV using unchanged pinned official MIT-LCP SQL | Project-owned MIMIC-IV adaptation of the published 2005 SAPS III model; not an official MIT-LCP implementation |
-| Physiologic window | Generally `(ICU intime, ICU intime + 24 h]` | `[ICU intime - 1 h, ICU intime + 1 h]` |
-| ICU discharge cap | No; the pinned SQL can use eligible hospital measurements after ICU discharge through hour 24 | No; the published admission window remains centered on ICU `intime` |
-| Score rows | 94,458 | 94,458 |
-| Complete recorded components | 10,148 (10.74%) | 3,542 (3.75%) |
-| Median score | 34 | 45 |
-| Median modeled mortality | 15.29% | Global 10.93%; North America 11.45% |
-| Primary limitation | Official total treats null component scores as zero; PaO2/FiO2 null can also mean not applicable | Narrow admission window plus several original variables that are unavailable or represented by imperfect proxies |
+| Property | SAPS II | SAPS III adapted | Classic first-day SOFA adapted |
+|---|---|---|---|
+| Output label | `sapsii_official`, `sapsii_prob_official` | `saps_iii_adapted`, global and North American adapted probabilities | `sofa_first_day_adapted`; six organ-component scores; no probability |
+| Status | Self-computed from raw MIMIC-IV using unchanged pinned official MIT-LCP SQL | Project-owned MIMIC-IV adaptation of the published 2005 SAPS III model; not an official MIT-LCP implementation | Project-owned, explicitly adapted classic SOFA based on pinned MIT-LCP v3.0.1 concepts; not SOFA-2 |
+| Physiologic window | Generally `(ICU intime, ICU intime + 24 h]` | `[ICU intime - 1 h, ICU intime + 1 h]` | Generally `[ICU intime - 6 h, ICU intime + 24 h]`; urine begins at `intime` |
+| ICU discharge cap | No; the pinned SQL can use eligible hospital measurements after ICU discharge through hour 24 | No; the published admission window remains centered on ICU `intime` | No; eligible labs through hour 24 and fixed urine thresholds are retained for short stays |
+| Score rows | 94,458 | 94,458 | 94,458 |
+| Complete recorded components | 10,148 (10.74%) | 3,542 (3.75%) | 19,223 (20.35%) |
+| Median score | 34 | 45 | Not included in the present aggregate deployment summary |
+| Median modeled mortality | 15.29% | Global 10.93%; North America 11.45% | Not applicable; classic SOFA defines no direct probability |
+| Primary limitation | Official total treats null component scores as zero; PaO2/FiO2 null can also mean not applicable | Narrow admission window plus several original variables that are unavailable or represented by imperfect proxies | Null components contribute zero; respiratory availability depends on a PaO2/FiO2 pair and bilirubin is not routinely measured |
 
-Scores and probabilities from the two systems are not interchangeable. They use
+Scores and probabilities from the three systems are not interchangeable. They use
 different variables, windows, coefficients, and calibrations. Differences between
 their mortality estimates must not be interpreted as errors or direct measures of
 model superiority.
@@ -434,15 +437,217 @@ validates cohort, source, code, SQL, and item-manifest identity before reusing s
 
 ---
 
-# 3. Interpretation and downstream use
+# 3. Classic first-day SOFA adapted
 
-For either score:
+## 3.1 What this score is
+
+`sofa_first_day_adapted` is a self-computed, one-row-per-ICU-stay classic SOFA score.
+It uses the six original organ systems—respiratory, coagulation, liver,
+cardiovascular, central nervous system, and renal—with each component ranging from 0
+to 4 and a total ranging from 0 to 24. Classic SOFA does not define a direct mortality
+probability, so this output contains no probability column.
+
+The implementation is based on MIT-LCP/mimic-code release `v3.0.1`, full commit
+`c7e07560dc847e32cbb0b2890213e8e7cbd8bc7e`. The pinned upstream DuckDB
+`first_day_sofa.sql` has SHA-256
+`02736bd4faf9885fed67de777ec85852b50e93ac1ddc03bd6e5039216ce3d86e`.
+Pinned measurement, ventilation, and vasopressor concepts execute unchanged. The
+project score is explicitly called adapted because it makes two documented changes:
+
+1. The legacy upstream first-day query gives ventilated P/F ratios below 100 and 200
+   scores of 4 and 3 but omits the classic scores of 2 and 1 for ventilated ratios from
+   200 through 399. This implementation restores the `<300` and `<400` branches and
+   takes the worse supported or unsupported category.
+2. It computes only the first-day MAP, platelet, bilirubin, creatinine, urine, and GCS
+   aggregates required by SOFA instead of materializing MIT-LCP's broad general-purpose
+   first-day tables. The joins, value directions, and boundary predicates for the used
+   variables are preserved.
+
+The output includes:
+
+- `sofa_first_day_adapted`;
+- `respiration_score`, `coagulation_score`, `liver_score`,
+  `cardiovascular_score`, `cns_score`, and `renal_score`;
+- component-driving minima, maxima, urine total, and vasopressor rates;
+- `adaptation_version = 'sofa-first-day-adapted-v1'`; and
+- `ventilated_pf_correction_applied = true`.
+
+This is classic SOFA with a documented MIMIC implementation adaptation. It is not the
+newer SOFA-2 system.
+
+## 3.2 Time window and value selection
+
+For PaO2/FiO2, MAP, laboratory measurements, and GCS, the general window is inclusive:
+
+```text
+ICU intime - 6 hours <= measurement time <= ICU intime + 24 hours
+```
+
+Urine output uses the inclusive interval from ICU `intime` through `intime + 24
+hours`. Vasopressor selection uses infusion `starttime` in the general `-6 h/+24 h`
+window, preserving the upstream behavior rather than testing interval overlap. The
+score window is not capped at ICU `outtime`.
+
+The respiratory component requires a PaO2/FiO2 ratio, whether or not the patient is
+mechanically ventilated. Same-specimen laboratory FiO2 is preferred. If it is absent,
+the pinned blood-gas concept uses the most recent valid charted FiO2 from zero through
+four hours before the PaO2 measurement. Invasive ventilation status at the gas time
+determines whether the severe supported categories apply; it is not a prerequisite
+for scores 0 through 2.
+
+`available_first_day_hours` remains descriptive ICU-overlap metadata. It does not cap
+the fixed score windows or normalize urine output for short stays.
+
+## 3.3 Full-cohort coverage and component missingness
+
+The completed output contains 94,458 unique ICU stays. Every stay has a total SOFA
+value. Of these, 19,223 (20.35%) have all six component-score columns non-null, while
+75,235 (79.65%) have at least one null component.
+
+| Component | Observed | Missing |
+|---|---:|---:|
+| Respiratory | 36,910 (39.08%) | 57,548 (60.92%) |
+| Coagulation | 93,340 (98.82%) | 1,118 (1.18%) |
+| Liver | 49,916 (52.84%) | 44,542 (47.16%) |
+| Cardiovascular | 94,248 (99.78%) | 210 (0.22%) |
+| CNS | 93,809 (99.31%) | 649 (0.69%) |
+| Renal | 94,228 (99.76%) | 230 (0.24%) |
+
+Completeness differs materially by ICU duration:
+
+| ICU-duration stratum | Stays | Complete components | Any component missing |
+|---|---:|---:|---:|
+| At least 24 h | 74,829 | 17,498 (23.38%) | 57,331 (76.62%) |
+| Shorter than 24 h | 19,615 | 1,716 (8.75%) | 17,899 (91.25%) |
+| Unknown `outtime` | 14 | 9 (64.29%) | 5 (35.71%) |
+
+Respiratory missingness is 54.95% for stays of at least 24 hours and 83.72% for short
+stays. Liver missingness is 46.08% and 51.28%, respectively. The other four components
+remain above 97% observed even among short stays.
+
+## 3.4 Respiratory missingness audit
+
+A separate read-only, identifier-free audit classified every missing respiratory
+component using the exact score window and P/F construction. It found no internal
+inconsistencies: no valid P/F ratio failed to produce a component, and no observed
+component lacked a valid P/F ratio.
+
+| Respiratory missingness cause | Stays | Percentage of respiratory-missing stays | Percentage of full cohort |
+|---|---:|---:|---:|
+| No PaO2 in the score window | 35,711 | 62.05% | 37.81% |
+| PaO2 present but no valid FiO2 pairing | 21,837 | 37.95% | 23.12% |
+| Internal inconsistency | 0 | 0.00% | 0.00% |
+
+Mechanical ventilation is not required for the component, but it is strongly
+associated with whether the necessary measurements are recorded:
+
+| Any invasive ventilation episode in the score window | Stays | Respiratory observed | Respiratory missing |
+|---|---:|---:|---:|
+| Yes | 31,305 | 28,595 (91.34%) | 2,710 (8.66%) |
+| No | 63,153 | 8,315 (13.17%) | 54,838 (86.83%) |
+
+Thus, 95.29% of respiratory-missing stays had no invasive ventilation episode in the
+window. This does not mean that SOFA requires ventilation: 8,315 non-ventilated stays
+had a valid respiratory component. It reflects clinical measurement practice.
+Ventilated patients commonly receive arterial blood gases and explicit FiO2
+documentation, whereas stable, postoperative, and brief non-ventilated stays often do
+not. Missing charted FiO2 also cannot safely be interpreted as room air because
+low-flow oxygen may have been delivered without an exact FiO2.
+
+Among valid respiratory observations, 32,610 stays had at least one P/F ratio using a
+charted-FiO2 fallback and 14,142 had at least one using same-specimen laboratory FiO2;
+9,842 had both during the window. These counts overlap and therefore must not be added
+as mutually exclusive categories.
+
+For the 105,183 stay–blood-gas pairs using charted FiO2 fallback, the age of the most
+recent qualifying FiO2 was:
+
+| Charted FiO2 age before PaO2 | Stay–gas pairs | Percentage |
+|---|---:|---:|
+| 0–15 minutes | 14,261 | 13.56% |
+| 16–60 minutes | 37,091 | 35.26% |
+| 61–120 minutes | 27,256 | 25.91% |
+| 121–240 minutes | 26,575 | 25.27% |
+
+No fallback exceeded the permitted four-hour interval. Extending the interval could
+recover additional ratios but would weaken temporal pairing and depart from the pinned
+MIT-LCP behavior. A SpO2/FiO2 substitution or room-air inference would likewise be a
+separately named sensitivity score, not a silent modification of this result.
+
+## 3.5 Missing-value semantics and limitations
+
+The total uses `COALESCE(component_score, 0)` for all six components, preserving the
+upstream missing-value convention. The nullable component columns remain unchanged and
+no additional imputation is performed. Therefore:
+
+- 100% total coverage does not mean 100% component coverage;
+- absent abnormal respiratory or liver information contributes zero and can lower the
+  total;
+- respiratory nullness means no valid P/F pair, not normal respiratory function;
+- urine output is not adjusted for an observation period shorter than 24 hours;
+- the fixed window may use hospital laboratory results after ICU discharge;
+- vasopressors are selected by infusion start time, so an infusion beginning before
+  `intime - 6 h` but continuing into the window may be omitted;
+- pre-ICU treatment in ICU `inputevents` may be incomplete;
+- GCS can be confounded by sedation, intubation, and asynchronous documentation; and
+- the preserved first-day blood-gas join uses subject and time and does not add an
+  arterial-specimen restriction.
+
+This output should be used with `score_missingness.parquet` and component-level
+sensitivity analyses. It is a reproducible research derivation, not a clinical
+decision system or a mortality-probability model.
+
+## 3.6 Deployment and reproducibility
+
+The validated full run used:
+
+| Property | Value |
+|---|---|
+| SLURM job | `2811701` (`sofa-full`) |
+| Partition | `c23ms` |
+| CPUs | 8 |
+| Requested memory | 32 GiB |
+| DuckDB memory limit | 24 GB |
+| Observed peak resident memory | approximately 20.14 GiB |
+| SLURM elapsed time | 2 minutes 44 seconds |
+| MIMIC version | 3.1 |
+| Adaptation/item manifest | `sofa-first-day-adapted-v1` |
+
+All 94,458 cohort stays matched and all six required output artifacts passed
+validation. The separate respiratory audit ran as SLURM job `2812341` in 16 seconds,
+using approximately 1.56 GiB peak resident memory. It opened the completed DuckDB
+database read-only and emitted aggregate results only.
+
+Primary outputs are under:
+
+```text
+outputs/full/sofa_first_day_adapted/
+  scores.parquet
+  score_missingness.parquet
+  component_missingness.csv
+  coverage.json
+  staging_statistics.json
+  run_manifest.json
+```
+
+The resumable full job is `slurm/run_sofa_first_day_adapted_full.slurm`; the aggregate
+respiratory audit is `slurm/audit_sofa_respiratory_full.slurm`. Both use SOFA-specific
+database, output, log, and spill paths. Full execution requires `CONFIRM_FULL=YES`.
+Run identity includes cohort and raw-source fingerprints, pinned SQL hashes, project
+SQL, source code, and the item-ID manifest.
+
+---
+
+# 4. Interpretation and downstream use
+
+For all three scores:
 
 1. Keep the component columns and `score_missingness.parquet` available during
    analysis; do not treat a populated total as evidence of complete measurement.
 2. Report missingness by component and, where relevant, by ICU-duration stratum.
-3. Do not substitute one probability column for an observed mortality outcome.
-4. Do not compare raw SAPS II and SAPS III totals as though they share a scale.
+3. Do not substitute a probability column for an observed mortality outcome; classic
+   SOFA has no direct probability column.
+4. Do not compare raw SAPS II, SAPS III, and SOFA totals as though they share a scale.
 5. Use `stay_id` as the join key and expect repeated patients or admissions when they
    contain multiple ICU stays.
 6. Preserve the run manifest with every analytical export so the exact cohort, code,
@@ -451,12 +656,14 @@ For either score:
    outputs as protected MIMIC-derived data.
 
 For implementation-level details, see
-[`saps_ii.md`](saps_ii.md) and
-[`saps_iii_adapted.md`](saps_iii_adapted.md).
+[`saps_ii.md`](saps_ii.md),
+[`saps_iii_adapted.md`](saps_iii_adapted.md), and
+[`sofa_first_day_adapted.md`](sofa_first_day_adapted.md).
 
 ## Document provenance
 
 This report was generated from the validated full-cohort `run_manifest.json`,
-`scores.parquet`, and `score_missingness.parquet` aggregates for both scores on
-2026-08-07. Cross-score validation confirmed equal row counts and equal ordered cohort
-hashes. No patient-level identifiers are reproduced in this document.
+`scores.parquet`, and `score_missingness.parquet` aggregates for all three scores on
+2026-08-07, plus the identifier-free SOFA respiratory audit. Cross-score validation
+confirmed equal row counts and equal ordered cohort hashes. No patient-level
+identifiers are reproduced in this document.

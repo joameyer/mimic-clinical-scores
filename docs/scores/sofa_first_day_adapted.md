@@ -91,6 +91,19 @@ selection by start time instead of overlap, GCS confounding, and fixed first-day
 thresholds for stays observed less than 24 hours. This is a research derivation and
 requires outcome validation/calibration in its intended population.
 
+For a completed run, the identifier-free respiratory audit separates missingness into
+absence of PaO2 versus PaO2 without valid FiO2, stratifies it by invasive ventilation
+and ICU duration, and reports the age of charted FiO2 fallbacks:
+
+```zsh
+./.venv/bin/python scripts/audit_sofa_respiratory_missingness.py \
+  --database work/full/sofa_first_day_adapted.duckdb
+```
+
+The command opens the completed database read-only and prints aggregates only.
+For the full database, use `slurm/audit_sofa_respiratory_full.slurm` so the audit runs
+on a compute node rather than the login node.
+
 ## Correctness tests
 
 Synthetic tests execute the same pinned prerequisite concepts twice: once against
