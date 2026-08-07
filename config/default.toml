@@ -1,0 +1,16 @@
+[dataset]
+mimic_version = "3.1"
+
+[runtime]
+threads = 4
+memory_limit = "48GB"
+
+[development]
+sample_size = 100
+seed = 20260807
+
+[official]
+score = "saps_ii"
+release = "v3.0.1"
+commit = "c7e07560dc847e32cbb0b2890213e8e7cbd8bc7e"
+

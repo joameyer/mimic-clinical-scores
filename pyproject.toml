@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools==80.9.0", "wheel==0.45.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mimic-clinical-scores"
+version = "0.1.0"
+description = "Cohort-filtered, provenance-aware clinical severity scores from raw MIMIC-IV"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = { text = "MIT" }
+authors = [{ name = "Joana Meyer" }]
+dependencies = [
+  "duckdb==1.3.2",
+  "pyarrow==20.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==8.4.1",
+]
+
+[project.scripts]
+mimic-clinical-scores = "mimic_clinical_scores.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"mimic_clinical_scores.scores.saps_ii" = ["*.json"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers"
+testpaths = ["tests"]
+markers = [
+  "demo: requires an explicitly configured official MIMIC-IV demo root",
+]

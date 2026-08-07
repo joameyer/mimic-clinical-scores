@@ -1,0 +1,1033 @@
+{
+  "entries": [
+    {
+      "clinical_meaning": "Alveolar-arterial Gradient",
+      "item_id": 50801,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Base Excess",
+      "item_id": 50802,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Calculated Bicarbonate, Whole Blood",
+      "item_id": 50803,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Calculated Total CO2",
+      "item_id": 50804,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Carboxyhemoglobin",
+      "item_id": 50805,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Chloride, Whole Blood",
+      "item_id": 50806,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Comments",
+      "item_id": 50807,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Free Calcium",
+      "item_id": 50808,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Glucose",
+      "item_id": 50809,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Hematocrit, Calculated",
+      "item_id": 50810,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Hemoglobin",
+      "item_id": 50811,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Lactate",
+      "item_id": 50813,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Methemoglobin",
+      "item_id": 50814,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "O2 Flow",
+      "item_id": 50815,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Oxygen",
+      "item_id": 50816,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Oxygen Saturation",
+      "item_id": 50817,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "pCO2",
+      "item_id": 50818,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "PEEP",
+      "item_id": 50819,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "pH",
+      "item_id": 50820,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "pO2",
+      "item_id": 50821,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Potassium, Whole Blood",
+      "item_id": 50822,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Required O2",
+      "item_id": 50823,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Sodium, Whole Blood",
+      "item_id": 50824,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Temperature",
+      "item_id": 50825,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Specimen Type",
+      "item_id": 52033,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain blood-gas fields used to derive arterial PaO2/FiO2",
+      "required_time_context": "first-day blood-gas rows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "O2 saturation pulseoxymetry",
+      "item_id": 220277,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain the official preceding oxygenation lookback",
+      "required_time_context": "SpO2 through 2 hours and FiO2 through 4 hours preceding each retained blood gas",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Inspired O2 Fraction",
+      "item_id": 223835,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain the official preceding oxygenation lookback",
+      "required_time_context": "SpO2 through 2 hours and FiO2 through 4 hours preceding each retained blood gas",
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef"
+    },
+    {
+      "clinical_meaning": "Albumin",
+      "item_id": 50862,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged chemistry concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/chemistry.sql",
+      "sql_sha256": "6f509898b49735bb476fcf18986c35fae44c0a388b789cf14ce6df7d425dc640"
+    },
+    {
+      "clinical_meaning": "Anion Gap",
+      "item_id": 50868,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged chemistry concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/chemistry.sql",
+      "sql_sha256": "6f509898b49735bb476fcf18986c35fae44c0a388b789cf14ce6df7d425dc640"
+    },
+    {
+      "clinical_meaning": "Bicarbonate",
+      "item_id": 50882,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged chemistry concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/chemistry.sql",
+      "sql_sha256": "6f509898b49735bb476fcf18986c35fae44c0a388b789cf14ce6df7d425dc640"
+    },
+    {
+      "clinical_meaning": "Calcium, Total",
+      "item_id": 50893,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged chemistry concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/chemistry.sql",
+      "sql_sha256": "6f509898b49735bb476fcf18986c35fae44c0a388b789cf14ce6df7d425dc640"
+    },
+    {
+      "clinical_meaning": "Chloride",
+      "item_id": 50902,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged chemistry concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/chemistry.sql",
+      "sql_sha256": "6f509898b49735bb476fcf18986c35fae44c0a388b789cf14ce6df7d425dc640"
+    },
+    {
+      "clinical_meaning": "Creatinine",
+      "item_id": 50912,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged chemistry concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/chemistry.sql",
+      "sql_sha256": "6f509898b49735bb476fcf18986c35fae44c0a388b789cf14ce6df7d425dc640"
+    },
+    {
+      "clinical_meaning": "Globulin",
+      "item_id": 50930,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged chemistry concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/chemistry.sql",
+      "sql_sha256": "6f509898b49735bb476fcf18986c35fae44c0a388b789cf14ce6df7d425dc640"
+    },
+    {
+      "clinical_meaning": "Glucose",
+      "item_id": 50931,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged chemistry concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/chemistry.sql",
+      "sql_sha256": "6f509898b49735bb476fcf18986c35fae44c0a388b789cf14ce6df7d425dc640"
+    },
+    {
+      "clinical_meaning": "Potassium",
+      "item_id": 50971,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged chemistry concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/chemistry.sql",
+      "sql_sha256": "6f509898b49735bb476fcf18986c35fae44c0a388b789cf14ce6df7d425dc640"
+    },
+    {
+      "clinical_meaning": "Protein, Total",
+      "item_id": 50976,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged chemistry concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/chemistry.sql",
+      "sql_sha256": "6f509898b49735bb476fcf18986c35fae44c0a388b789cf14ce6df7d425dc640"
+    },
+    {
+      "clinical_meaning": "Sodium",
+      "item_id": 50983,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged chemistry concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/chemistry.sql",
+      "sql_sha256": "6f509898b49735bb476fcf18986c35fae44c0a388b789cf14ce6df7d425dc640"
+    },
+    {
+      "clinical_meaning": "Urea Nitrogen",
+      "item_id": 51006,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged chemistry concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/chemistry.sql",
+      "sql_sha256": "6f509898b49735bb476fcf18986c35fae44c0a388b789cf14ce6df7d425dc640"
+    },
+    {
+      "clinical_meaning": "Hematocrit",
+      "item_id": 51221,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged complete blood count concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/complete_blood_count.sql",
+      "sql_sha256": "d5de5c0f8df5d58a726526811240bb13bf775f1319acf1da24df14368995001a"
+    },
+    {
+      "clinical_meaning": "Hemoglobin",
+      "item_id": 51222,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged complete blood count concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/complete_blood_count.sql",
+      "sql_sha256": "d5de5c0f8df5d58a726526811240bb13bf775f1319acf1da24df14368995001a"
+    },
+    {
+      "clinical_meaning": "MCH",
+      "item_id": 51248,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged complete blood count concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/complete_blood_count.sql",
+      "sql_sha256": "d5de5c0f8df5d58a726526811240bb13bf775f1319acf1da24df14368995001a"
+    },
+    {
+      "clinical_meaning": "MCHC",
+      "item_id": 51249,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged complete blood count concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/complete_blood_count.sql",
+      "sql_sha256": "d5de5c0f8df5d58a726526811240bb13bf775f1319acf1da24df14368995001a"
+    },
+    {
+      "clinical_meaning": "MCV",
+      "item_id": 51250,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged complete blood count concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/complete_blood_count.sql",
+      "sql_sha256": "d5de5c0f8df5d58a726526811240bb13bf775f1319acf1da24df14368995001a"
+    },
+    {
+      "clinical_meaning": "Platelet Count",
+      "item_id": 51265,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged complete blood count concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/complete_blood_count.sql",
+      "sql_sha256": "d5de5c0f8df5d58a726526811240bb13bf775f1319acf1da24df14368995001a"
+    },
+    {
+      "clinical_meaning": "RDW",
+      "item_id": 51277,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged complete blood count concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/complete_blood_count.sql",
+      "sql_sha256": "d5de5c0f8df5d58a726526811240bb13bf775f1319acf1da24df14368995001a"
+    },
+    {
+      "clinical_meaning": "Red Blood Cells",
+      "item_id": 51279,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged complete blood count concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/complete_blood_count.sql",
+      "sql_sha256": "d5de5c0f8df5d58a726526811240bb13bf775f1319acf1da24df14368995001a"
+    },
+    {
+      "clinical_meaning": "White Blood Cells",
+      "item_id": 51301,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged complete blood count concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/complete_blood_count.sql",
+      "sql_sha256": "d5de5c0f8df5d58a726526811240bb13bf775f1319acf1da24df14368995001a"
+    },
+    {
+      "clinical_meaning": "Platelet Aggregation",
+      "item_id": 52159,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged complete blood count concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/complete_blood_count.sql",
+      "sql_sha256": "d5de5c0f8df5d58a726526811240bb13bf775f1319acf1da24df14368995001a"
+    },
+    {
+      "clinical_meaning": "Alanine Aminotransferase (ALT)",
+      "item_id": 50861,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged enzyme concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/enzyme.sql",
+      "sql_sha256": "19372275662b2330963902cc19dd96b295d61d4db7145de52f7ee36ac9fdd927"
+    },
+    {
+      "clinical_meaning": "Alkaline Phosphatase",
+      "item_id": 50863,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged enzyme concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/enzyme.sql",
+      "sql_sha256": "19372275662b2330963902cc19dd96b295d61d4db7145de52f7ee36ac9fdd927"
+    },
+    {
+      "clinical_meaning": "Amylase",
+      "item_id": 50867,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged enzyme concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/enzyme.sql",
+      "sql_sha256": "19372275662b2330963902cc19dd96b295d61d4db7145de52f7ee36ac9fdd927"
+    },
+    {
+      "clinical_meaning": "Asparate Aminotransferase (AST)",
+      "item_id": 50878,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged enzyme concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/enzyme.sql",
+      "sql_sha256": "19372275662b2330963902cc19dd96b295d61d4db7145de52f7ee36ac9fdd927"
+    },
+    {
+      "clinical_meaning": "Bilirubin, Direct",
+      "item_id": 50883,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged enzyme concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/enzyme.sql",
+      "sql_sha256": "19372275662b2330963902cc19dd96b295d61d4db7145de52f7ee36ac9fdd927"
+    },
+    {
+      "clinical_meaning": "Bilirubin, Indirect",
+      "item_id": 50884,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged enzyme concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/enzyme.sql",
+      "sql_sha256": "19372275662b2330963902cc19dd96b295d61d4db7145de52f7ee36ac9fdd927"
+    },
+    {
+      "clinical_meaning": "Bilirubin, Total",
+      "item_id": 50885,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged enzyme concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/enzyme.sql",
+      "sql_sha256": "19372275662b2330963902cc19dd96b295d61d4db7145de52f7ee36ac9fdd927"
+    },
+    {
+      "clinical_meaning": "Creatine Kinase (CK)",
+      "item_id": 50910,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged enzyme concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/enzyme.sql",
+      "sql_sha256": "19372275662b2330963902cc19dd96b295d61d4db7145de52f7ee36ac9fdd927"
+    },
+    {
+      "clinical_meaning": "Creatine Kinase, MB Isoenzyme",
+      "item_id": 50911,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged enzyme concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/enzyme.sql",
+      "sql_sha256": "19372275662b2330963902cc19dd96b295d61d4db7145de52f7ee36ac9fdd927"
+    },
+    {
+      "clinical_meaning": "Gamma Glutamyltransferase",
+      "item_id": 50927,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged enzyme concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/enzyme.sql",
+      "sql_sha256": "19372275662b2330963902cc19dd96b295d61d4db7145de52f7ee36ac9fdd927"
+    },
+    {
+      "clinical_meaning": "Lactate Dehydrogenase (LD)",
+      "item_id": 50954,
+      "raw_table": "mimiciv_hosp.labevents",
+      "reason_for_retention": "retain the unchanged enzyme concept inputs",
+      "required_time_context": "union of cohort windows; charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/enzyme.sql",
+      "sql_sha256": "19372275662b2330963902cc19dd96b295d61d4db7145de52f7ee36ac9fdd927"
+    },
+    {
+      "clinical_meaning": "GCS - Eye Opening",
+      "item_id": 220739,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "the official reconstruction uses the immediately preceding GCS row without a finite lookback",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/gcs.sql",
+      "sql_sha256": "c9240ecf40b2fd6fd6844f209a1f493b73e899bbec2c872809affb5c353c7478"
+    },
+    {
+      "clinical_meaning": "GCS - Verbal Response",
+      "item_id": 223900,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "the official reconstruction uses the immediately preceding GCS row without a finite lookback",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/gcs.sql",
+      "sql_sha256": "c9240ecf40b2fd6fd6844f209a1f493b73e899bbec2c872809affb5c353c7478"
+    },
+    {
+      "clinical_meaning": "GCS - Motor Response",
+      "item_id": 223901,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "the official reconstruction uses the immediately preceding GCS row without a finite lookback",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/gcs.sql",
+      "sql_sha256": "c9240ecf40b2fd6fd6844f209a1f493b73e899bbec2c872809affb5c353c7478"
+    },
+    {
+      "clinical_meaning": "O2 Flow",
+      "item_id": 223834,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain complete oxygen-delivery context for ventilation episode construction",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/oxygen_delivery.sql",
+      "sql_sha256": "0a381c174ec508f826f1aa02edcede89be2376c302a6580b3ddfe483cffe48e0"
+    },
+    {
+      "clinical_meaning": "O2 Delivery Device(s)",
+      "item_id": 226732,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain complete oxygen-delivery context for ventilation episode construction",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/oxygen_delivery.sql",
+      "sql_sha256": "0a381c174ec508f826f1aa02edcede89be2376c302a6580b3ddfe483cffe48e0"
+    },
+    {
+      "clinical_meaning": "O2 Flow (additional cannula)",
+      "item_id": 227287,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain complete oxygen-delivery context for ventilation episode construction",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/oxygen_delivery.sql",
+      "sql_sha256": "0a381c174ec508f826f1aa02edcede89be2376c302a6580b3ddfe483cffe48e0"
+    },
+    {
+      "clinical_meaning": "BiPap O2 Flow",
+      "item_id": 227582,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain complete oxygen-delivery context for ventilation episode construction",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/oxygen_delivery.sql",
+      "sql_sha256": "0a381c174ec508f826f1aa02edcede89be2376c302a6580b3ddfe483cffe48e0"
+    },
+    {
+      "clinical_meaning": "R Ureteral Stent",
+      "item_id": 226557,
+      "raw_table": "mimiciv_icu.outputevents",
+      "reason_for_retention": "retain all events summed by the official first-day urine-output logic",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/urine_output.sql",
+      "sql_sha256": "bf9605e4ea7bcae0e8c44768ca1abce8a098ff3a0b44bfaffcbb2be157216611"
+    },
+    {
+      "clinical_meaning": "L Ureteral Stent",
+      "item_id": 226558,
+      "raw_table": "mimiciv_icu.outputevents",
+      "reason_for_retention": "retain all events summed by the official first-day urine-output logic",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/urine_output.sql",
+      "sql_sha256": "bf9605e4ea7bcae0e8c44768ca1abce8a098ff3a0b44bfaffcbb2be157216611"
+    },
+    {
+      "clinical_meaning": "Foley",
+      "item_id": 226559,
+      "raw_table": "mimiciv_icu.outputevents",
+      "reason_for_retention": "retain all events summed by the official first-day urine-output logic",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/urine_output.sql",
+      "sql_sha256": "bf9605e4ea7bcae0e8c44768ca1abce8a098ff3a0b44bfaffcbb2be157216611"
+    },
+    {
+      "clinical_meaning": "Void",
+      "item_id": 226560,
+      "raw_table": "mimiciv_icu.outputevents",
+      "reason_for_retention": "retain all events summed by the official first-day urine-output logic",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/urine_output.sql",
+      "sql_sha256": "bf9605e4ea7bcae0e8c44768ca1abce8a098ff3a0b44bfaffcbb2be157216611"
+    },
+    {
+      "clinical_meaning": "Condom Cath",
+      "item_id": 226561,
+      "raw_table": "mimiciv_icu.outputevents",
+      "reason_for_retention": "retain all events summed by the official first-day urine-output logic",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/urine_output.sql",
+      "sql_sha256": "bf9605e4ea7bcae0e8c44768ca1abce8a098ff3a0b44bfaffcbb2be157216611"
+    },
+    {
+      "clinical_meaning": "Suprapubic",
+      "item_id": 226563,
+      "raw_table": "mimiciv_icu.outputevents",
+      "reason_for_retention": "retain all events summed by the official first-day urine-output logic",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/urine_output.sql",
+      "sql_sha256": "bf9605e4ea7bcae0e8c44768ca1abce8a098ff3a0b44bfaffcbb2be157216611"
+    },
+    {
+      "clinical_meaning": "R Nephrostomy",
+      "item_id": 226564,
+      "raw_table": "mimiciv_icu.outputevents",
+      "reason_for_retention": "retain all events summed by the official first-day urine-output logic",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/urine_output.sql",
+      "sql_sha256": "bf9605e4ea7bcae0e8c44768ca1abce8a098ff3a0b44bfaffcbb2be157216611"
+    },
+    {
+      "clinical_meaning": "L Nephrostomy",
+      "item_id": 226565,
+      "raw_table": "mimiciv_icu.outputevents",
+      "reason_for_retention": "retain all events summed by the official first-day urine-output logic",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/urine_output.sql",
+      "sql_sha256": "bf9605e4ea7bcae0e8c44768ca1abce8a098ff3a0b44bfaffcbb2be157216611"
+    },
+    {
+      "clinical_meaning": "Straight Cath",
+      "item_id": 226567,
+      "raw_table": "mimiciv_icu.outputevents",
+      "reason_for_retention": "retain all events summed by the official first-day urine-output logic",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/urine_output.sql",
+      "sql_sha256": "bf9605e4ea7bcae0e8c44768ca1abce8a098ff3a0b44bfaffcbb2be157216611"
+    },
+    {
+      "clinical_meaning": "Ileoconduit",
+      "item_id": 226584,
+      "raw_table": "mimiciv_icu.outputevents",
+      "reason_for_retention": "retain all events summed by the official first-day urine-output logic",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/urine_output.sql",
+      "sql_sha256": "bf9605e4ea7bcae0e8c44768ca1abce8a098ff3a0b44bfaffcbb2be157216611"
+    },
+    {
+      "clinical_meaning": "GU Irrigant Volume In",
+      "item_id": 227488,
+      "raw_table": "mimiciv_icu.outputevents",
+      "reason_for_retention": "retain all events summed by the official first-day urine-output logic",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/urine_output.sql",
+      "sql_sha256": "bf9605e4ea7bcae0e8c44768ca1abce8a098ff3a0b44bfaffcbb2be157216611"
+    },
+    {
+      "clinical_meaning": "GU Irrigant/Urine Volume Out",
+      "item_id": 227489,
+      "raw_table": "mimiciv_icu.outputevents",
+      "reason_for_retention": "retain all events summed by the official first-day urine-output logic",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours",
+      "source_concept": "measurement/urine_output.sql",
+      "sql_sha256": "bf9605e4ea7bcae0e8c44768ca1abce8a098ff3a0b44bfaffcbb2be157216611"
+    },
+    {
+      "clinical_meaning": "PEEP set",
+      "item_id": 220339,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "a finite filter is not proven equivalent for episodes overlapping the score window",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/ventilator_setting.sql",
+      "sql_sha256": "6a6938a619d46d9be0ee6d2203e294abdda4b2782ecf1b5e90a3a393378e8dc7"
+    },
+    {
+      "clinical_meaning": "Inspired O2 Fraction",
+      "item_id": 223835,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "a finite filter is not proven equivalent for episodes overlapping the score window",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/ventilator_setting.sql",
+      "sql_sha256": "6a6938a619d46d9be0ee6d2203e294abdda4b2782ecf1b5e90a3a393378e8dc7"
+    },
+    {
+      "clinical_meaning": "Ventilator Type",
+      "item_id": 223848,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "a finite filter is not proven equivalent for episodes overlapping the score window",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/ventilator_setting.sql",
+      "sql_sha256": "6a6938a619d46d9be0ee6d2203e294abdda4b2782ecf1b5e90a3a393378e8dc7"
+    },
+    {
+      "clinical_meaning": "Ventilator Mode",
+      "item_id": 223849,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "a finite filter is not proven equivalent for episodes overlapping the score window",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/ventilator_setting.sql",
+      "sql_sha256": "6a6938a619d46d9be0ee6d2203e294abdda4b2782ecf1b5e90a3a393378e8dc7"
+    },
+    {
+      "clinical_meaning": "Tidal Volume (set)",
+      "item_id": 224684,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "a finite filter is not proven equivalent for episodes overlapping the score window",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/ventilator_setting.sql",
+      "sql_sha256": "6a6938a619d46d9be0ee6d2203e294abdda4b2782ecf1b5e90a3a393378e8dc7"
+    },
+    {
+      "clinical_meaning": "Tidal Volume (observed)",
+      "item_id": 224685,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "a finite filter is not proven equivalent for episodes overlapping the score window",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/ventilator_setting.sql",
+      "sql_sha256": "6a6938a619d46d9be0ee6d2203e294abdda4b2782ecf1b5e90a3a393378e8dc7"
+    },
+    {
+      "clinical_meaning": "Tidal Volume (spontaneous)",
+      "item_id": 224686,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "a finite filter is not proven equivalent for episodes overlapping the score window",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/ventilator_setting.sql",
+      "sql_sha256": "6a6938a619d46d9be0ee6d2203e294abdda4b2782ecf1b5e90a3a393378e8dc7"
+    },
+    {
+      "clinical_meaning": "Minute Volume",
+      "item_id": 224687,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "a finite filter is not proven equivalent for episodes overlapping the score window",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/ventilator_setting.sql",
+      "sql_sha256": "6a6938a619d46d9be0ee6d2203e294abdda4b2782ecf1b5e90a3a393378e8dc7"
+    },
+    {
+      "clinical_meaning": "Respiratory Rate (Set)",
+      "item_id": 224688,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "a finite filter is not proven equivalent for episodes overlapping the score window",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/ventilator_setting.sql",
+      "sql_sha256": "6a6938a619d46d9be0ee6d2203e294abdda4b2782ecf1b5e90a3a393378e8dc7"
+    },
+    {
+      "clinical_meaning": "Respiratory Rate (spontaneous)",
+      "item_id": 224689,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "a finite filter is not proven equivalent for episodes overlapping the score window",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/ventilator_setting.sql",
+      "sql_sha256": "6a6938a619d46d9be0ee6d2203e294abdda4b2782ecf1b5e90a3a393378e8dc7"
+    },
+    {
+      "clinical_meaning": "Respiratory Rate (Total)",
+      "item_id": 224690,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "a finite filter is not proven equivalent for episodes overlapping the score window",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/ventilator_setting.sql",
+      "sql_sha256": "6a6938a619d46d9be0ee6d2203e294abdda4b2782ecf1b5e90a3a393378e8dc7"
+    },
+    {
+      "clinical_meaning": "Flow Rate (L/min)",
+      "item_id": 224691,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "a finite filter is not proven equivalent for episodes overlapping the score window",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/ventilator_setting.sql",
+      "sql_sha256": "6a6938a619d46d9be0ee6d2203e294abdda4b2782ecf1b5e90a3a393378e8dc7"
+    },
+    {
+      "clinical_meaning": "Plateau Pressure",
+      "item_id": 224696,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "a finite filter is not proven equivalent for episodes overlapping the score window",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/ventilator_setting.sql",
+      "sql_sha256": "6a6938a619d46d9be0ee6d2203e294abdda4b2782ecf1b5e90a3a393378e8dc7"
+    },
+    {
+      "clinical_meaning": "Total PEEP Level",
+      "item_id": 224700,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "a finite filter is not proven equivalent for episodes overlapping the score window",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/ventilator_setting.sql",
+      "sql_sha256": "6a6938a619d46d9be0ee6d2203e294abdda4b2782ecf1b5e90a3a393378e8dc7"
+    },
+    {
+      "clinical_meaning": "Ventilator Mode (Hamilton)",
+      "item_id": 229314,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "a finite filter is not proven equivalent for episodes overlapping the score window",
+      "required_time_context": "all available events for selected stays",
+      "source_concept": "measurement/ventilator_setting.sql",
+      "sql_sha256": "6a6938a619d46d9be0ee6d2203e294abdda4b2782ecf1b5e90a3a393378e8dc7"
+    },
+    {
+      "clinical_meaning": "Heart Rate",
+      "item_id": 220045,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain all item IDs read by the unchanged vital-sign concept",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; oxygenation lookback may retain earlier shared item IDs",
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97"
+    },
+    {
+      "clinical_meaning": "Arterial Blood Pressure systolic",
+      "item_id": 220050,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain all item IDs read by the unchanged vital-sign concept",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; oxygenation lookback may retain earlier shared item IDs",
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97"
+    },
+    {
+      "clinical_meaning": "Arterial Blood Pressure diastolic",
+      "item_id": 220051,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain all item IDs read by the unchanged vital-sign concept",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; oxygenation lookback may retain earlier shared item IDs",
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97"
+    },
+    {
+      "clinical_meaning": "Arterial Blood Pressure mean",
+      "item_id": 220052,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain all item IDs read by the unchanged vital-sign concept",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; oxygenation lookback may retain earlier shared item IDs",
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97"
+    },
+    {
+      "clinical_meaning": "Non Invasive Blood Pressure systolic",
+      "item_id": 220179,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain all item IDs read by the unchanged vital-sign concept",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; oxygenation lookback may retain earlier shared item IDs",
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97"
+    },
+    {
+      "clinical_meaning": "Non Invasive Blood Pressure diastolic",
+      "item_id": 220180,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain all item IDs read by the unchanged vital-sign concept",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; oxygenation lookback may retain earlier shared item IDs",
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97"
+    },
+    {
+      "clinical_meaning": "Non Invasive Blood Pressure mean",
+      "item_id": 220181,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain all item IDs read by the unchanged vital-sign concept",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; oxygenation lookback may retain earlier shared item IDs",
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97"
+    },
+    {
+      "clinical_meaning": "Respiratory Rate",
+      "item_id": 220210,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain all item IDs read by the unchanged vital-sign concept",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; oxygenation lookback may retain earlier shared item IDs",
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97"
+    },
+    {
+      "clinical_meaning": "O2 saturation pulseoxymetry",
+      "item_id": 220277,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain all item IDs read by the unchanged vital-sign concept",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; oxygenation lookback may retain earlier shared item IDs",
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97"
+    },
+    {
+      "clinical_meaning": "Glucose (serum)",
+      "item_id": 220621,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain all item IDs read by the unchanged vital-sign concept",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; oxygenation lookback may retain earlier shared item IDs",
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97"
+    },
+    {
+      "clinical_meaning": "Temperature Fahrenheit",
+      "item_id": 223761,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain all item IDs read by the unchanged vital-sign concept",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; oxygenation lookback may retain earlier shared item IDs",
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97"
+    },
+    {
+      "clinical_meaning": "Temperature Celsius",
+      "item_id": 223762,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain all item IDs read by the unchanged vital-sign concept",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; oxygenation lookback may retain earlier shared item IDs",
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97"
+    },
+    {
+      "clinical_meaning": "Temperature Site",
+      "item_id": 224642,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain all item IDs read by the unchanged vital-sign concept",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; oxygenation lookback may retain earlier shared item IDs",
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97"
+    },
+    {
+      "clinical_meaning": "Respiratory Rate (Total)",
+      "item_id": 224690,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain all item IDs read by the unchanged vital-sign concept",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; oxygenation lookback may retain earlier shared item IDs",
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97"
+    },
+    {
+      "clinical_meaning": "ART BP Systolic",
+      "item_id": 225309,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain all item IDs read by the unchanged vital-sign concept",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; oxygenation lookback may retain earlier shared item IDs",
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97"
+    },
+    {
+      "clinical_meaning": "ART BP Diastolic",
+      "item_id": 225310,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain all item IDs read by the unchanged vital-sign concept",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; oxygenation lookback may retain earlier shared item IDs",
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97"
+    },
+    {
+      "clinical_meaning": "ART BP Mean",
+      "item_id": 225312,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain all item IDs read by the unchanged vital-sign concept",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; oxygenation lookback may retain earlier shared item IDs",
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97"
+    },
+    {
+      "clinical_meaning": "Glucose finger stick (range 70-100)",
+      "item_id": 225664,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain all item IDs read by the unchanged vital-sign concept",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; oxygenation lookback may retain earlier shared item IDs",
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97"
+    },
+    {
+      "clinical_meaning": "Glucose (whole blood)",
+      "item_id": 226537,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain all item IDs read by the unchanged vital-sign concept",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; oxygenation lookback may retain earlier shared item IDs",
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97"
+    },
+    {
+      "clinical_meaning": "O2 Delivery Device(s)",
+      "item_id": 226732,
+      "raw_table": "mimiciv_icu.chartevents",
+      "reason_for_retention": "retain CPAP/BiPAP classification used directly by SAPS II",
+      "required_time_context": "charttime > ICU intime and <= intime + 24 hours; retained for all stay time because it also drives ventilation",
+      "source_concept": "score/sapsii.sql",
+      "sql_sha256": "66a78d61a2887f9ac690618209d5e3022aa0271324646561af350de8597d7efa"
+    }
+  ],
+  "manifest_version": "saps-ii-v1",
+  "mimic_code_commit": "c7e07560dc847e32cbb0b2890213e8e7cbd8bc7e",
+  "mimic_code_release": "v3.0.1"
+}

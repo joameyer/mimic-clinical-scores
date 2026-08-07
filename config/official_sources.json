@@ -1,0 +1,39 @@
+{
+  "repository": "https://github.com/MIT-LCP/mimic-code.git",
+  "release": "v3.0.1",
+  "commit": "c7e07560dc847e32cbb0b2890213e8e7cbd8bc7e",
+  "selected_reason": "Latest published MIT-LCP mimic-code release inspected on 2026-08-07; v3.0.1 is immutable and includes the DuckDB concepts introduced in v2.5.0.",
+  "license_path": "LICENSE",
+  "canonical_table_definition": "mimic-iv/concepts/score/sapsii.sql",
+  "execution_order": [
+    "mimic-iv/concepts_duckdb/demographics/age.sql",
+    "mimic-iv/concepts_duckdb/measurement/bg.sql",
+    "mimic-iv/concepts_duckdb/measurement/chemistry.sql",
+    "mimic-iv/concepts_duckdb/measurement/complete_blood_count.sql",
+    "mimic-iv/concepts_duckdb/measurement/enzyme.sql",
+    "mimic-iv/concepts_duckdb/measurement/gcs.sql",
+    "mimic-iv/concepts_duckdb/measurement/oxygen_delivery.sql",
+    "mimic-iv/concepts_duckdb/measurement/urine_output.sql",
+    "mimic-iv/concepts_duckdb/measurement/ventilator_setting.sql",
+    "mimic-iv/concepts_duckdb/measurement/vitalsign.sql",
+    "mimic-iv/concepts_duckdb/treatment/ventilation.sql",
+    "mimic-iv/concepts_duckdb/score/sapsii.sql"
+  ],
+  "sha256": {
+    "LICENSE": "fa5b4187cc5da20dc4f27d76d59c8507d1389a76559b5f56ab48a222d1eb3bb5",
+    "mimic-iv/concepts/score/sapsii.sql": "4e4edd9569e3db4432d99ebe3c7e01a7507d7a73be74186ae038c9b58b7410fe",
+    "mimic-iv/concepts_duckdb/demographics/age.sql": "6316e9ce5f6a9b81f76fff1b891eb014287603e59e24e5704a59195819d06bfc",
+    "mimic-iv/concepts_duckdb/measurement/bg.sql": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef",
+    "mimic-iv/concepts_duckdb/measurement/chemistry.sql": "6f509898b49735bb476fcf18986c35fae44c0a388b789cf14ce6df7d425dc640",
+    "mimic-iv/concepts_duckdb/measurement/complete_blood_count.sql": "d5de5c0f8df5d58a726526811240bb13bf775f1319acf1da24df14368995001a",
+    "mimic-iv/concepts_duckdb/measurement/enzyme.sql": "19372275662b2330963902cc19dd96b295d61d4db7145de52f7ee36ac9fdd927",
+    "mimic-iv/concepts_duckdb/measurement/gcs.sql": "c9240ecf40b2fd6fd6844f209a1f493b73e899bbec2c872809affb5c353c7478",
+    "mimic-iv/concepts_duckdb/measurement/oxygen_delivery.sql": "0a381c174ec508f826f1aa02edcede89be2376c302a6580b3ddfe483cffe48e0",
+    "mimic-iv/concepts_duckdb/measurement/urine_output.sql": "bf9605e4ea7bcae0e8c44768ca1abce8a098ff3a0b44bfaffcbb2be157216611",
+    "mimic-iv/concepts_duckdb/measurement/ventilator_setting.sql": "6a6938a619d46d9be0ee6d2203e294abdda4b2782ecf1b5e90a3a393378e8dc7",
+    "mimic-iv/concepts_duckdb/measurement/vitalsign.sql": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97",
+    "mimic-iv/concepts_duckdb/treatment/ventilation.sql": "4171114e000030a542ea860413c2576e5937e3da278608fe7fb81e21c1fe1ba9",
+    "mimic-iv/concepts_duckdb/score/sapsii.sql": "66a78d61a2887f9ac690618209d5e3022aa0271324646561af350de8597d7efa"
+  }
+}
+

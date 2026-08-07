@@ -1,0 +1,38 @@
+# Protected cohort identifiers
+inputs/*.parquet
+inputs/*_manifest.json
+
+# Raw and staged MIMIC-derived data
+data/mimic-iv*/
+raw/
+work/
+outputs/
+logs/
+*.duckdb
+*.duckdb.wal
+*.wal
+*.parquet.tmp
+spill/
+tmp/
+
+# Downloaded vendor metadata (vendored source files remain tracked)
+vendor/**/.git/
+
+# Environments and Python tooling
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/
+
+# OS/editor files
+.DS_Store
+*.swp
+
