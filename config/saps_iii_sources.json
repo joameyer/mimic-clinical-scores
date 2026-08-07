@@ -1,0 +1,22 @@
+{
+  "adaptation_version": "saps-iii-adapted-v1",
+  "model": "SAPS III admission score (2005)",
+  "upstream_implementation": "No MIT-LCP/mimic-code SAPS III concept exists in release v3.0.1; this is a project-owned, explicitly adapted implementation.",
+  "sources": [
+    {
+      "title": "SAPS 3 Admission Score Sheet / Score Algorithm",
+      "url": "https://www.saps3.org/assets/Downloads/988c8d7eb3/SAPS-3-Admission-Score-Sheet-Score-Algorithm.pdf",
+      "sha256": "ef0e9a6bfae5b20e2bcff11f3be7f60b6def33fb4c30025e2563e1dba83c7fa2"
+    },
+    {
+      "title": "SAPS 3 data definitions and variable coding supplement",
+      "url": "https://www.icuregswe.org/globalassets/riktlinjer/saps3_3_supp.pdf",
+      "sha256": "b07353ba89af3981327aacad22f03908a84eb166ac2594223ba8cfd815e8b091"
+    },
+    {
+      "title": "Development and validation of SAPS 3 admission prognostic model, Part II",
+      "doi": "10.1007/s00134-005-2763-5",
+      "url": "https://link.springer.com/article/10.1007/s00134-005-2763-5"
+    }
+  ]
+}

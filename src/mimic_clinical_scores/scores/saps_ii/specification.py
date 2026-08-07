@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from mimic_clinical_scores.common.specification import Concept
+from mimic_clinical_scores.common.provenance import sha256_file
 
 
 MIMIC_CODE_RELEASE = "v3.0.1"
@@ -132,12 +133,20 @@ class SAPSIISpecification:
     component_columns: tuple[str, ...] = COMPONENT_COLUMNS
     required_raw_tables: tuple[str, ...] = tuple(EXPECTED_HEADERS)
     expected_headers: dict[str, tuple[str, ...]] = None  # type: ignore[assignment]
+    score_columns: tuple[str, ...] = ("sapsii",)
+    probability_columns: tuple[str, ...] = ("sapsii_prob",)
+    score_table: str = "mimiciv_derived.sapsii"
+    provenance_label: str = "official MIT-LCP mimic-code SAPS II"
+    item_manifest_version: str = "saps-ii-v1"
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "expected_headers", EXPECTED_HEADERS)
 
     def vendor_root(self, project_root: Path) -> Path:
         return project_root / "vendor" / "mimic-code"
+
+    def score_vendor_root(self, project_root: Path) -> Path:
+        return self.vendor_root(project_root)
 
     def item_ids(self, raw_table: str) -> frozenset[int]:
         return frozenset(
@@ -161,6 +170,25 @@ class SAPSIISpecification:
             and entry["source_concept"] in all_context_concepts
         )
 
+    def sql_hashes(self, project_root: Path) -> dict[str, str]:
+        root = self.vendor_root(project_root)
+        concepts = (*self.concepts, self.score_concept)
+        return {concept.sql_relative_path: sha256_file(root / concept.sql_relative_path) for concept in concepts}
+
+    def scores_projection_sql(self) -> str:
+        from mimic_clinical_scores.scores.saps_ii.scoring import scores_projection_sql
+
+        return scores_projection_sql()
+
+    def missingness_projection_sql(self) -> str:
+        from mimic_clinical_scores.scores.saps_ii.scoring import missingness_projection_sql
+
+        return missingness_projection_sql()
+
+    def staging_rules(self):
+        from mimic_clinical_scores.scores.saps_ii.staging_rules import RULES
+
+        return RULES
+
 
 SAPSII_SPEC = SAPSIISpecification()
-

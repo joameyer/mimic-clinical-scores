@@ -17,6 +17,7 @@ from mimic_clinical_scores.common.duckdb import (
     table_exists,
 )
 from mimic_clinical_scores.common.provenance import canonical_json_hash
+from mimic_clinical_scores.common.specification import ScoreSpecification
 from mimic_clinical_scores.scores.saps_ii.specification import SAPSII_SPEC
 from mimic_clinical_scores.scores.saps_ii.staging_rules import (
     CHARTEVENT_FULL_CONTEXT_ITEM_IDS,
@@ -64,6 +65,15 @@ RAW_SCHEMAS: dict[str, tuple[tuple[str, str], ...]] = {
         ("transfertime", "TIMESTAMP"), ("prev_service", "VARCHAR"),
         ("curr_service", "VARCHAR"),
     ),
+    "hosp/transfers.csv.gz": (
+        ("subject_id", "INTEGER"), ("hadm_id", "INTEGER"), ("transfer_id", "INTEGER"),
+        ("eventtype", "VARCHAR"), ("careunit", "VARCHAR"),
+        ("intime", "TIMESTAMP"), ("outtime", "TIMESTAMP"),
+    ),
+    "hosp/procedures_icd.csv.gz": (
+        ("subject_id", "INTEGER"), ("hadm_id", "INTEGER"), ("seq_num", "INTEGER"),
+        ("chartdate", "DATE"), ("icd_code", "VARCHAR"), ("icd_version", "SMALLINT"),
+    ),
     "icu/chartevents.csv.gz": (
         ("subject_id", "INTEGER"), ("hadm_id", "INTEGER"), ("stay_id", "INTEGER"),
         ("caregiver_id", "INTEGER"), ("charttime", "TIMESTAMP"),
@@ -74,6 +84,19 @@ RAW_SCHEMAS: dict[str, tuple[tuple[str, str], ...]] = {
         ("subject_id", "INTEGER"), ("hadm_id", "INTEGER"), ("stay_id", "INTEGER"),
         ("first_careunit", "VARCHAR"), ("last_careunit", "VARCHAR"),
         ("intime", "TIMESTAMP"), ("outtime", "TIMESTAMP"), ("los", "DOUBLE"),
+    ),
+    "icu/inputevents.csv.gz": (
+        ("subject_id", "INTEGER"), ("hadm_id", "INTEGER"), ("stay_id", "INTEGER"),
+        ("caregiver_id", "INTEGER"), ("starttime", "TIMESTAMP"), ("endtime", "TIMESTAMP"),
+        ("storetime", "TIMESTAMP"), ("itemid", "INTEGER"), ("amount", "DOUBLE"),
+        ("amountuom", "VARCHAR"), ("rate", "DOUBLE"), ("rateuom", "VARCHAR"),
+        ("orderid", "BIGINT"), ("linkorderid", "BIGINT"),
+        ("ordercategoryname", "VARCHAR"), ("secondaryordercategoryname", "VARCHAR"),
+        ("ordercomponenttypedescription", "VARCHAR"), ("ordercategorydescription", "VARCHAR"),
+        ("patientweight", "DOUBLE"), ("totalamount", "DOUBLE"), ("totalamountuom", "VARCHAR"),
+        ("isopenbag", "SMALLINT"), ("continueinnextdept", "SMALLINT"),
+        ("statusdescription", "VARCHAR"), ("originalamount", "DOUBLE"),
+        ("originalrate", "DOUBLE"),
     ),
     "icu/outputevents.csv.gz": (
         ("subject_id", "INTEGER"), ("hadm_id", "INTEGER"), ("stay_id", "INTEGER"),
@@ -120,13 +143,19 @@ def _select_columns(relative: str, alias: str = "raw") -> str:
     return ", ".join(f"{alias}.{name}" for name, _ in RAW_SCHEMAS[relative])
 
 
-def _filter_sql(relative: str, qualified_table: str, source: Path) -> str:
+def _filter_sql(
+    relative: str,
+    qualified_table: str,
+    source: Path,
+    specification: ScoreSpecification = SAPSII_SPEC,
+) -> str:
     scan = _csv_scan(source, relative)
     columns = _select_columns(relative)
     if qualified_table == "mimiciv_icu.icustays":
         predicate = "EXISTS (SELECT 1 FROM pipeline_meta.cohort c WHERE c.stay_id = raw.stay_id)"
     elif qualified_table in {
-        "mimiciv_hosp.admissions", "mimiciv_hosp.services", "mimiciv_hosp.diagnoses_icd"
+        "mimiciv_hosp.admissions", "mimiciv_hosp.services", "mimiciv_hosp.diagnoses_icd",
+        "mimiciv_hosp.transfers", "mimiciv_hosp.procedures_icd",
     }:
         predicate = (
             "EXISTS (SELECT 1 FROM pipeline_meta.cohort_context c "
@@ -137,6 +166,84 @@ def _filter_sql(relative: str, qualified_table: str, source: Path) -> str:
             "EXISTS (SELECT 1 FROM pipeline_meta.cohort_context c "
             "WHERE c.subject_id = raw.subject_id)"
         )
+    elif specification.name == "saps_iii_adapted" and qualified_table == "mimiciv_icu.chartevents":
+        predicate = f"""
+            raw.itemid IN ({_id_list(specification.item_ids(qualified_table))})
+            AND EXISTS (
+                SELECT 1 FROM pipeline_meta.cohort_context c
+                WHERE c.stay_id = raw.stay_id
+                  AND raw.charttime >= c.intime - CASE WHEN raw.itemid=223835 THEN INTERVAL '3' HOUR ELSE INTERVAL '1' HOUR END
+                  AND raw.charttime <= c.intime + INTERVAL '1' HOUR
+            )
+        """
+    elif specification.name == "saps_iii_adapted" and qualified_table == "mimiciv_hosp.labevents":
+        predicate = f"""
+            raw.itemid IN ({_id_list(specification.item_ids(qualified_table))})
+            AND EXISTS (
+                SELECT 1 FROM pipeline_meta.cohort_context c
+                WHERE c.hadm_id = raw.hadm_id
+                  AND raw.charttime >= c.intime - INTERVAL '1' HOUR
+                  AND raw.charttime <= c.intime + INTERVAL '1' HOUR
+            )
+        """
+    elif specification.name == "saps_iii_adapted" and qualified_table == "mimiciv_icu.inputevents":
+        predicate = f"""
+            raw.itemid IN ({_id_list(specification.item_ids(qualified_table))})
+            AND EXISTS (
+                SELECT 1 FROM pipeline_meta.cohort_context c
+                WHERE c.stay_id = raw.stay_id
+                  AND raw.starttime < c.intime
+                  AND raw.endtime > c.intime - INTERVAL '24' HOUR
+            )
+        """
+    elif specification.name == "sofa_first_day_adapted" and qualified_table == "mimiciv_icu.chartevents":
+        all_ids = specification.item_ids(qualified_table)
+        full_context_ids = specification.full_context_item_ids(qualified_table)
+        predicate = f"""
+            raw.itemid IN ({_id_list(all_ids)})
+            AND EXISTS (
+                SELECT 1 FROM pipeline_meta.cohort_context c
+                WHERE c.stay_id = raw.stay_id
+                  AND (
+                    raw.itemid IN ({_id_list(full_context_ids)})
+                    OR (
+                      raw.itemid NOT IN ({_id_list(full_context_ids)})
+                      AND raw.charttime >= c.intime - INTERVAL '6' HOUR
+                      AND raw.charttime <= c.intime + INTERVAL '24' HOUR
+                    )
+                  )
+            )
+        """
+    elif specification.name == "sofa_first_day_adapted" and qualified_table == "mimiciv_hosp.labevents":
+        predicate = f"""
+            raw.itemid IN ({_id_list(specification.item_ids(qualified_table))})
+            AND EXISTS (
+                SELECT 1 FROM pipeline_meta.cohort_context c
+                WHERE c.subject_id = raw.subject_id
+                  AND raw.charttime >= c.intime - INTERVAL '6' HOUR
+                  AND raw.charttime <= c.intime + INTERVAL '24' HOUR
+            )
+        """
+    elif specification.name == "sofa_first_day_adapted" and qualified_table == "mimiciv_icu.inputevents":
+        predicate = f"""
+            raw.itemid IN ({_id_list(specification.item_ids(qualified_table))})
+            AND EXISTS (
+                SELECT 1 FROM pipeline_meta.cohort_context c
+                WHERE c.stay_id = raw.stay_id
+                  AND raw.starttime >= c.intime - INTERVAL '6' HOUR
+                  AND raw.starttime <= c.intime + INTERVAL '24' HOUR
+            )
+        """
+    elif specification.name == "sofa_first_day_adapted" and qualified_table == "mimiciv_icu.outputevents":
+        predicate = f"""
+            raw.itemid IN ({_id_list(specification.item_ids(qualified_table))})
+            AND EXISTS (
+                SELECT 1 FROM pipeline_meta.cohort_context c
+                WHERE c.stay_id = raw.stay_id
+                  AND raw.charttime >= c.intime
+                  AND raw.charttime <= c.intime + INTERVAL '24' HOUR
+            )
+        """
     elif qualified_table == "mimiciv_icu.chartevents":
         predicate = f"""
             raw.itemid IN ({_id_list(CHARTEVENT_ITEM_IDS)})
@@ -295,6 +402,7 @@ def build_staging(
     identity_hash: str,
     raw_metadata: dict[str, dict[str, Any]],
     profile_directory: Path,
+    specification: ScoreSpecification = SAPSII_SPEC,
 ) -> list[dict[str, Any]]:
     """Scan each required source once and atomically stage its retained rows."""
 
@@ -303,22 +411,41 @@ def build_staging(
     profile_directory.chmod(0o700)
     results: list[dict[str, Any]] = []
 
-    for relative, qualified_table in STAGING_ORDER:
+    order = tuple(
+        (relative, table)
+        for relative, table in (
+            ("icu/icustays.csv.gz", "mimiciv_icu.icustays"),
+            ("hosp/admissions.csv.gz", "mimiciv_hosp.admissions"),
+            ("hosp/patients.csv.gz", "mimiciv_hosp.patients"),
+            ("hosp/services.csv.gz", "mimiciv_hosp.services"),
+            ("hosp/transfers.csv.gz", "mimiciv_hosp.transfers"),
+            ("hosp/diagnoses_icd.csv.gz", "mimiciv_hosp.diagnoses_icd"),
+            ("hosp/procedures_icd.csv.gz", "mimiciv_hosp.procedures_icd"),
+            ("icu/chartevents.csv.gz", "mimiciv_icu.chartevents"),
+            ("hosp/labevents.csv.gz", "mimiciv_hosp.labevents"),
+            ("icu/inputevents.csv.gz", "mimiciv_icu.inputevents"),
+            ("icu/outputevents.csv.gz", "mimiciv_icu.outputevents"),
+        )
+        if relative in specification.required_raw_tables
+    )
+    rules = specification.staging_rules()
+    for relative, qualified_table in order:
         source = mimic_root / relative
         metadata = raw_metadata[relative]
-        rule = RULES[qualified_table]
+        rule = rules[qualified_table]
         artifact_name = f"staging:{qualified_table}"
         artifact_hash = canonical_json_hash(
             {
                 "source_fingerprint": metadata["source_fingerprint"],
                 "filter": rule.filter_summary,
-                "item_manifest": "saps-ii-v1",
+                "item_manifest": getattr(specification, "item_manifest_version", "saps-ii-v1"),
                 "item_ids": sorted(
-                    SAPSII_SPEC.item_ids(qualified_table)
+                    specification.item_ids(qualified_table)
                     if qualified_table in {
                         "mimiciv_icu.chartevents",
                         "mimiciv_hosp.labevents",
                         "mimiciv_icu.outputevents",
+                        "mimiciv_icu.inputevents",
                     }
                     else []
                 ),
@@ -337,7 +464,7 @@ def build_staging(
         sql = (
             "PRAGMA enable_profiling = 'json'; "
             f"PRAGMA profiling_output = {_literal(str(profile_path.resolve()))}; "
-            + _filter_sql(relative, qualified_table, source)
+            + _filter_sql(relative, qualified_table, source, specification)
         )
 
         def stop_profile(con: duckdb.DuckDBPyConnection) -> None:

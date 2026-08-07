@@ -1,4 +1,4 @@
-"""Resumable command-line pipeline for cohort-filtered SAPS II."""
+"""Resumable command-line pipeline for registered clinical scores."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ from mimic_clinical_scores.common.export import export_all, validate_exports
 from mimic_clinical_scores.common.preflight import identity_payload, run_preflight
 from mimic_clinical_scores.common.provenance import atomic_write_json
 from mimic_clinical_scores.common.staging import build_staging
-from mimic_clinical_scores.scores.saps_ii.specification import SAPSII_SPEC
+from mimic_clinical_scores.scores.registry import SCORES, get_score
 
 
 LOGGER = logging.getLogger("mimic_clinical_scores")
@@ -39,6 +39,7 @@ def _project_default() -> Path:
 
 
 def _add_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--score", choices=tuple(sorted(SCORES)), default="saps_ii")
     parser.add_argument("--mode", choices=("dev100", "full"), required=True)
     parser.add_argument("--project-root", type=Path, default=_project_default())
     parser.add_argument("--mimic-root", type=Path, default=os.environ.get("MIMIC_ROOT"))
@@ -93,7 +94,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("preflight", "Validate metadata only; no complete clinical event scan"),
         ("build-staging", "Build normalized cohort-filtered raw tables"),
         ("build-concepts", "Build required upstream official concepts"),
-        ("compute", "Execute the pinned official SAPS II SQL"),
+        ("compute", "Execute the selected score SQL"),
         ("export", "Write atomic Parquet/CSV/JSON outputs"),
         ("validate", "Validate completed outputs"),
         ("run-all", "Run every resumable stage in order"),
@@ -113,9 +114,11 @@ def _resolve_paths(args: argparse.Namespace) -> None:
             raise ValueError("Full mode requires an explicit --cohort-file")
         args.cohort_file = args.project_root / "inputs" / "cohort_dev100.parquet"
     args.cohort_file = args.cohort_file.resolve()
-    args.database = (args.database or args.project_root / "work" / args.mode / "saps_ii.duckdb").resolve()
+    args.database = (
+        args.database or args.project_root / "work" / args.mode / f"{args.score}.duckdb"
+    ).resolve()
     args.output_dir = (
-        args.output_dir or args.project_root / "outputs" / args.mode / "saps_ii"
+        args.output_dir or args.project_root / "outputs" / args.mode / args.score
     ).resolve()
     args.log_dir = (args.log_dir or args.project_root / "logs" / args.mode).resolve()
     args.spill_directory = (
@@ -149,12 +152,14 @@ def _load_cohort_manifest(args: argparse.Namespace) -> dict[str, Any] | None:
 
 
 def _preflight(args: argparse.Namespace) -> dict[str, Any]:
+    specification = get_score(args.score)
     report = run_preflight(
         project_root=args.project_root,
         mimic_root=args.mimic_root,
         cohort_file=args.cohort_file,
         mode=args.mode,
         verify_raw_checksums=args.verify_raw_checksums,
+        specification=specification,
     )
     LOGGER.info(
         "preflight complete mode=%s cohort_rows=%d sources=%d concepts=%d",
@@ -199,6 +204,7 @@ def _log_results(stage: str, results: list[dict[str, object]]) -> None:
 
 
 def _run_pipeline_command(args: argparse.Namespace) -> dict[str, Any]:
+    specification = get_score(args.score)
     preflight = _preflight(args)
     if args.command == "preflight":
         report_path = args.log_dir / "preflight.json"
@@ -218,6 +224,7 @@ def _run_pipeline_command(args: argparse.Namespace) -> dict[str, Any]:
                 identity_hash=identity_hash,
                 raw_metadata=preflight["raw_sources"],
                 profile_directory=args.log_dir / "profiles",
+                specification=specification,
             )
             _log_results("staging", staging_results)
             if args.command == "build-staging":
@@ -226,17 +233,12 @@ def _run_pipeline_command(args: argparse.Namespace) -> dict[str, Any]:
         if args.command in {"build-concepts", "run-all"}:
             require_tables(
                 connection,
-                (
-                    "mimiciv_hosp.admissions", "mimiciv_hosp.diagnoses_icd",
-                    "mimiciv_hosp.labevents", "mimiciv_hosp.patients",
-                    "mimiciv_hosp.services", "mimiciv_icu.chartevents",
-                    "mimiciv_icu.icustays", "mimiciv_icu.outputevents",
-                ),
+                preflight["official"]["raw_tables"],
             )
             concept_results = build_concepts(
                 connection,
-                concepts=SAPSII_SPEC.concepts,
-                vendor_root=SAPSII_SPEC.vendor_root(args.project_root),
+                concepts=specification.concepts,
+                vendor_root=specification.vendor_root(args.project_root),
                 identity_hash=identity_hash,
             )
             _log_results("concept", concept_results)
@@ -244,11 +246,11 @@ def _run_pipeline_command(args: argparse.Namespace) -> dict[str, Any]:
                 return {"identity": identity_hash, "concepts": concept_results}
 
         if args.command in {"compute", "run-all"}:
-            require_tables(connection, (concept.output_table for concept in SAPSII_SPEC.concepts))
+            require_tables(connection, (concept.output_table for concept in specification.concepts))
             score_results = build_concepts(
                 connection,
-                concepts=(SAPSII_SPEC.score_concept,),
-                vendor_root=SAPSII_SPEC.vendor_root(args.project_root),
+                concepts=(specification.score_concept,),
+                vendor_root=specification.score_vendor_root(args.project_root),
                 identity_hash=identity_hash,
             )
             _log_results("score", score_results)
@@ -256,7 +258,7 @@ def _run_pipeline_command(args: argparse.Namespace) -> dict[str, Any]:
                 return {"identity": identity_hash, "score": score_results}
 
         if args.command in {"export", "run-all"}:
-            require_tables(connection, (SAPSII_SPEC.score_concept.output_table,))
+            require_tables(connection, (specification.score_concept.output_table,))
             manifest = export_all(
                 connection,
                 output_directory=args.output_dir,
@@ -267,6 +269,7 @@ def _run_pipeline_command(args: argparse.Namespace) -> dict[str, Any]:
                 preflight=preflight,
                 runtime=settings,
                 command_line=sys.argv,
+                specification=specification,
             )
             LOGGER.info("exports complete output=%s", args.output_dir)
             if args.command == "export":

@@ -32,8 +32,11 @@
     "mimic-iv/concepts_duckdb/measurement/urine_output.sql": "bf9605e4ea7bcae0e8c44768ca1abce8a098ff3a0b44bfaffcbb2be157216611",
     "mimic-iv/concepts_duckdb/measurement/ventilator_setting.sql": "6a6938a619d46d9be0ee6d2203e294abdda4b2782ecf1b5e90a3a393378e8dc7",
     "mimic-iv/concepts_duckdb/measurement/vitalsign.sql": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97",
+    "mimic-iv/concepts_duckdb/medication/dobutamine.sql": "f514b7e2ade37032e98c51ba82bf592244d1f1d5384b63b541d455f957b33df0",
+    "mimic-iv/concepts_duckdb/medication/dopamine.sql": "75284fe0209c7a19b0c859d11d2658e56385430bad38c9aaa75174667ea861ec",
+    "mimic-iv/concepts_duckdb/medication/epinephrine.sql": "b021cd639961440438faa0e0573363b35be10f3c2b9c8da041b79e1431d470a0",
+    "mimic-iv/concepts_duckdb/medication/norepinephrine.sql": "4085001f87dcdeeccde5877eb0dd3cc9718c7a8aab2bb57c2a6ab41c063ffabd",
     "mimic-iv/concepts_duckdb/treatment/ventilation.sql": "4171114e000030a542ea860413c2576e5937e3da278608fe7fb81e21c1fe1ba9",
     "mimic-iv/concepts_duckdb/score/sapsii.sql": "66a78d61a2887f9ac690618209d5e3022aa0271324646561af350de8597d7efa"
   }
 }
-

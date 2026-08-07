@@ -1,0 +1,462 @@
+# SAPS II and SAPS III adapted in MIMIC-IV 3.1
+
+## Purpose and scope
+
+This document describes the two ICU severity-score outputs produced by this repository:
+
+- a self-computed SAPS II that executes pinned official MIT-LCP/mimic-code SQL; and
+- a project-owned `saps_iii_adapted` score that preserves the published SAPS III point
+  model while explicitly approximating variables that cannot be recovered faithfully
+  from structured MIMIC-IV.
+
+Both full outputs contain exactly one row for each of the same 94,458 MIMIC-IV ICU
+stays. The ordered cohort hashes match, every `stay_id` is unique and non-null, and the
+score and missingness files have identical membership. The unit of analysis is the ICU
+stay, not the patient or hospital admission. A patient with multiple ICU stays can
+therefore contribute multiple score rows.
+
+All identifiers, DuckDB databases, logs, and patient-level output files are protected
+MIMIC-derived data. The statistics below are aggregate and contain no identifiers.
+
+## At-a-glance comparison
+
+| Property | SAPS II | SAPS III adapted |
+|---|---|---|
+| Output label | `sapsii_official`, `sapsii_prob_official` | `saps_iii_adapted`, global and North American adapted probabilities |
+| Status | Self-computed from raw MIMIC-IV using unchanged pinned official MIT-LCP SQL | Project-owned MIMIC-IV adaptation of the published 2005 SAPS III model; not an official MIT-LCP implementation |
+| Physiologic window | Generally `(ICU intime, ICU intime + 24 h]` | `[ICU intime - 1 h, ICU intime + 1 h]` |
+| ICU discharge cap | No; the pinned SQL can use eligible hospital measurements after ICU discharge through hour 24 | No; the published admission window remains centered on ICU `intime` |
+| Score rows | 94,458 | 94,458 |
+| Complete recorded components | 10,148 (10.74%) | 3,542 (3.75%) |
+| Median score | 34 | 45 |
+| Median modeled mortality | 15.29% | Global 10.93%; North America 11.45% |
+| Primary limitation | Official total treats null component scores as zero; PaO2/FiO2 null can also mean not applicable | Narrow admission window plus several original variables that are unavailable or represented by imperfect proxies |
+
+Scores and probabilities from the two systems are not interchangeable. They use
+different variables, windows, coefficients, and calibrations. Differences between
+their mortality estimates must not be interpreted as errors or direct measures of
+model superiority.
+
+---
+
+# 1. SAPS II
+
+## 1.1 What this score is
+
+This is a self-computed SAPS II derived from raw MIMIC-IV 3.1 tables. It is not copied
+from a blocked feature table and does not use `dynamic_8h.parquet` or
+`dynamic_15m.parquet`.
+
+The implementation pins MIT-LCP/mimic-code release
+[`v3.0.1`](https://github.com/MIT-LCP/mimic-code/releases/tag/v3.0.1) at full commit
+[`c7e07560dc847e32cbb0b2890213e8e7cbd8bc7e`](https://github.com/MIT-LCP/mimic-code/commit/c7e07560dc847e32cbb0b2890213e8e7cbd8bc7e).
+Its eleven prerequisite concepts and final SAPS II SQL are vendored and executed
+unchanged. Preflight verifies the commit declaration and SHA-256 of every used file.
+
+The calculation uses authoritative raw ICU identifiers and timestamps. Normalized,
+cohort- and item-filtered raw tables are staged under the MIMIC-compatible schemas
+expected by the official SQL. The official result is exported as:
+
+- `sapsii_official`: the SAPS II point total;
+- `sapsii_prob_official`: the corresponding official logistic mortality estimate; and
+- the 15 original component-score columns.
+
+The probability is calculated by the pinned SQL as:
+
+```text
+logit = -7.7631 + 0.0737 × SAPS II + 0.9971 × ln(SAPS II + 1)
+probability = 1 / (1 + exp(-logit))
+```
+
+This probability is a model estimate, not an observed outcome or a guarantee of an
+individual patient's risk.
+
+## 1.2 Time window and value selection
+
+The score window starts at raw `icustays.intime` and ends 24 hours later. Most score
+joins use `charttime > intime AND charttime <= intime + 24 hours`: a measurement
+exactly at ICU admission is excluded, while a measurement exactly at hour 24 is
+included. The official concepts preserve their own GCS, FiO2/SpO2, oxygen-delivery,
+and ventilation-episode context.
+
+Eligible worst values are selected across the window rather than medians or the last
+measurement. ICU `outtime` does not cap the official score window. Consequently, a
+hospital laboratory result after ICU discharge but no later than `intime + 24 hours`
+can contribute. Stays shorter than 24 hours are retained.
+
+`available_first_day_hours` is descriptive ICU-overlap metadata calculated from
+`outtime - intime`, capped at 24 hours. It does not change the official window.
+
+## 1.3 Full-cohort results
+
+| Statistic | Value |
+|---|---:|
+| ICU stays | 94,458 |
+| Minimum score | 0 |
+| 25th percentile | 26 |
+| Median | 34 |
+| Mean | 35.39 |
+| 75th percentile | 43 |
+| Maximum | 115 |
+| Minimum probability | 0.04% |
+| Median probability | 15.29% |
+| Mean probability | 22.48% |
+| Maximum probability | 99.57% |
+
+Every stay has a total and probability. This reflects the official missing-component
+calculation described below; it does not imply complete measurements.
+
+## 1.4 Component missingness
+
+`score_missingness.parquet` retains one Boolean missingness indicator for every
+component. Full-cohort results were:
+
+| Component | Observed | Missing |
+|---|---:|---:|
+| Age | 94,458 (100.00%) | 0 (0.00%) |
+| Heart rate | 94,372 (99.91%) | 86 (0.09%) |
+| Systolic BP | 94,270 (99.80%) | 188 (0.20%) |
+| Temperature | 91,706 (97.09%) | 2,752 (2.91%) |
+| PaO2/FiO2 | 24,947 (26.41%) | 69,511 (73.59%) |
+| Urine output | 89,442 (94.69%) | 5,016 (5.31%) |
+| BUN | 91,425 (96.79%) | 3,033 (3.21%) |
+| WBC | 90,904 (96.24%) | 3,554 (3.76%) |
+| Potassium | 91,459 (96.83%) | 2,999 (3.17%) |
+| Sodium | 91,491 (96.86%) | 2,967 (3.14%) |
+| Bicarbonate | 91,427 (96.79%) | 3,031 (3.21%) |
+| Bilirubin | 41,077 (43.49%) | 53,381 (56.51%) |
+| GCS | 93,719 (99.22%) | 739 (0.78%) |
+| Comorbidity | 94,458 (100.00%) | 0 (0.00%) |
+| Admission type | 94,458 (100.00%) | 0 (0.00%) |
+
+There were 10,148 stays (10.74%) with all 15 component-score columns non-null. Exactly
+one component was null for 43.18% and exactly two were null for 39.50%; 93.42% of stays
+therefore had no more than two null components. The median was one null component.
+
+Completeness differed by ICU duration:
+
+| ICU-duration stratum | Stays | Complete | Mean null components | Median null components |
+|---|---:|---:|---:|---:|
+| At least 24 h | 74,829 | 9,563 (12.78%) | 1.39 | 1 |
+| Shorter than 24 h | 19,615 | 585 (2.98%) | 2.20 | 2 |
+| Unknown `outtime` | 14 | 0 | 7.00 | 7 |
+
+The low PaO2/FiO2 coverage requires careful interpretation: in the official SQL, a
+null PaO2/FiO2 component commonly occurs when no qualifying ventilated/CPAP blood gas
+exists. It can therefore reflect non-applicability as well as an unmeasured required
+value. Bilirubin is also not routinely measured in every ICU stay.
+
+## 1.5 Missing-value semantics and limitations
+
+The official SQL calculates the total using
+`COALESCE(component_score, 0)` for every component. The project deliberately preserves
+the original component nulls and adds no further imputation. Therefore:
+
+- a non-null `sapsii_official` or `sapsii_prob_official` does not mean the clinical
+  inputs were complete;
+- an unavailable abnormal component contributes zero points and may lower the total;
+- PaO2/FiO2 nullness mixes non-applicability with missing observation;
+- shorter stays have materially fewer complete components, even though they are not
+  excluded; and
+- the probability inherits the original SAPS II calibration and has not been
+  recalibrated specifically for MIMIC-IV 3.1 or this analysis population.
+
+Additional limitations inherited from the pinned implementation include its fixed
+24-hour window beyond ICU discharge, diagnosis-based comorbidity ascertainment, and
+its exact service-based admission classification. These choices are preserved for
+reproducibility rather than silently reinterpreted.
+
+## 1.6 Deployment and reproducibility
+
+The full run used:
+
+| Property | Value |
+|---|---|
+| SLURM job | `2806835` (`sapsii-full`) |
+| Partition | `c23ms` |
+| CPUs | 8 |
+| Requested memory | 64 GiB |
+| DuckDB memory limit | 48 GB |
+| Manifest elapsed time | 141.87 seconds |
+| MIMIC version | 3.1 |
+| Item manifest | `saps-ii-v1` |
+
+The longest staging scans were `chartevents` (432,997,491 source rows; 35,239,384
+retained; 77.16 seconds) and `labevents` (158,374,764 source rows; 5,771,397 retained;
+48.08 seconds). The final output passed validation with 94,458 unique, non-null stays.
+
+Primary outputs are under:
+
+```text
+outputs/full/saps_ii/
+  scores.parquet
+  score_missingness.parquet
+  component_missingness.csv
+  coverage.json
+  staging_statistics.json
+  run_manifest.json
+```
+
+The resumable full job is `slurm/run_full.slurm`. Production state is fingerprinted by
+cohort content, raw-source metadata, code, SQL hashes, and the item manifest. Changed
+inputs are rejected rather than mixed with an existing database. A deliberate full
+submission requires `CONFIRM_FULL=YES` and the CLI's `--confirm-full` guard.
+
+This SAPS II run predates addition of the generic `score_provenance` text field, so that
+single field is null in its historical run manifest. Provenance remains unambiguous:
+the same manifest records mimic-code release `v3.0.1`, the full commit, the complete
+concept order, SQL hashes, and item-manifest version.
+
+---
+
+# 2. SAPS III adapted
+
+## 2.1 What this score is
+
+`saps_iii_adapted` is a self-computed, project-owned MIMIC-IV adaptation of the 2005
+SAPS III admission model. It is not called official SAPS III because MIT-LCP/mimic-code
+v3.0.1 contains no SAPS III implementation and structured MIMIC-IV cannot reproduce
+several original admission-time variables exactly.
+
+The point cut-offs and mortality equations were taken from the pinned
+[SAPS 3 Admission Score Sheet / Score Algorithm](https://www.saps3.org/assets/Downloads/988c8d7eb3/SAPS-3-Admission-Score-Sheet-Score-Algorithm.pdf),
+the [data-definition supplement](https://www.icuregswe.org/globalassets/riktlinjer/saps3_3_supp.pdf),
+and the [original development paper](https://link.springer.com/article/10.1007/s00134-005-2763-5).
+The two source PDFs are pinned by SHA-256. The project SQL and item-ID declaration are
+versioned as `saps-iii-adapted-v1` and hashed into the run identity.
+
+The output contains:
+
+- `saps_iii_adapted`: the adapted point total;
+- `saps_iii_prob_global_adapted`: the published global equation applied to that total;
+- `saps_iii_prob_north_america_adapted`: the published North American equation applied
+  to that total;
+- all 20 component-score columns; and
+- raw-value, proxy, availability, and adaptation-version audit fields.
+
+The equations are:
+
+```text
+global logit = -32.6659 + 7.3068 × ln(score + 20.5958)
+North America logit = -18.8839 + 4.3979 × ln(score + 1)
+probability = 1 / (1 + exp(-logit))
+```
+
+Applying a published equation does not make the adapted variables equivalent to the
+original model inputs. Both probability columns must be described as adapted and
+should be externally validated or recalibrated for an intended predictive use.
+
+## 2.2 Time window and value selection
+
+SAPS III is an ICU-admission score, not a first-24-hour score. Physiologic values are
+selected from the inclusive interval:
+
+```text
+ICU intime - 1 hour <= measurement time <= ICU intime + 1 hour
+```
+
+The score is finalized after the window closes at `intime + 1 hour`; it is not a score
+using only the hour after admission. Measurements need not all share one timestamp.
+Each component needs at least one eligible value somewhere in the window, with these
+important exceptions:
+
+- GCS requires a complete eye, verbal, and motor set sharing one chart time; the lowest
+  complete total is selected.
+- Mechanically ventilated oxygenation requires PaO2 and a valid FiO2 pairing. Same-time
+  laboratory FiO2 is preferred; otherwise the latest charted FiO2 in the preceding two
+  hours is used.
+- Pre-ICU vasoactive therapy is contextual and uses audited infusion events overlapping
+  the 24 hours before ICU admission, not the physiology window.
+
+Other contextual inputs use hospital admission, transfer, service, diagnosis, and
+procedure history. The window is always centered on raw `icustays.intime`, not
+`admissions.admittime`. Hospital admission time is used to calculate pre-ICU hospital
+length of stay.
+
+`available_first_day_hours` and `stay_shorter_than_24h` are shared ICU-duration audit
+fields. They do not define or modify the two-hour SAPS III admission window.
+
+## 2.3 MIMIC-IV adaptations
+
+| Original SAPS III information | MIMIC-IV implementation | Principal limitation |
+|---|---|---|
+| Age and pre-ICU hospital LOS | Raw patient anchor fields, hospital `admittime`, ICU `intime` | Anchor-based age rather than an unshifted calendar date |
+| Location before ICU | Latest transfer care unit strictly before ICU | Care-unit names are mapped to original categories |
+| Comorbidities | High-specificity ICD proxies for AIDS, metastatic cancer, hematologic cancer, cirrhosis | Hospital discharge diagnoses are post-hoc; NYHA IV and recent cancer therapy are unavailable |
+| Vasoactive drugs before ICU | ICU `inputevents` for dopamine >=5 mcg/kg/min or continuous dobutamine, epinephrine, norepinephrine for at least one hour | Ward and ED therapy is incompletely represented in ICU input records |
+| Planned ICU admission | Elective admission plus surgical service or preceding OR location | The original decision being made at least 12 hours earlier is not observed |
+| Reason for ICU admission | High-specificity ICD groups | Diagnoses are post-hoc and not the clinician-stated admission reason; multiple reasons use a documented project priority rule |
+| Surgery status and site | Procedure ICD codes dated no later than the ICU calendar day plus admission type | Procedure dates have day resolution; the original 24-hour planning distinction is unavailable |
+| Infection | Respiratory-infection/septic-shock ICD proxies plus pre-ICU hospital LOS | Site and hospital acquisition cannot be established exactly |
+| Estimated GCS | Lowest complete contemporaneous charted GCS set | Pre-sedation estimated GCS is unavailable |
+| Mechanical ventilation | Presence of audited ventilator-setting records in the admission window | A settings-based proxy rather than the original manually abstracted state |
+
+Unavailable original variables are not silently claimed as observed. The patient-level
+output records `nyha_iv_available = false`, `cancer_therapy_available = false`, and
+`pre_sedation_gcs_available = false` for every stay. Their absent information receives
+the original reference-category contribution of zero points.
+
+## 2.4 Full-cohort results
+
+| Statistic | Value |
+|---|---:|
+| ICU stays | 94,458 |
+| Minimum score | 7 |
+| 25th percentile | 37 |
+| Median | 45 |
+| Mean | 46.06 |
+| 75th percentile | 54 |
+| Maximum | 125 |
+| Global probability: median | 10.93% |
+| Global probability: mean | 17.11% |
+| Global probability: minimum–maximum | 0.02%–97.65% |
+| North America probability: median | 11.45% |
+| North America probability: mean | 15.78% |
+| North America probability: minimum–maximum | 0.006%–91.57% |
+
+Every stay has a total and both probabilities because null component contributions use
+the reference category. This does not imply that the original SAPS III information was
+complete.
+
+## 2.5 Component missingness
+
+The ten adapted context component scores are non-null for every stay because the
+adaptation returns either proxy-derived points or the zero-point reference category.
+For those components, “observed” means “a score was assigned,” not “the original SAPS
+III fact was known exactly.”
+
+Physiologic missingness was:
+
+| Component | Observed | Missing |
+|---|---:|---:|
+| GCS | 55,575 (58.84%) | 38,883 (41.16%) |
+| Heart rate | 71,079 (75.25%) | 23,379 (24.75%) |
+| Systolic BP | 70,099 (74.21%) | 24,359 (25.79%) |
+| Temperature | 62,091 (65.73%) | 32,367 (34.27%) |
+| Bilirubin | 12,680 (13.42%) | 81,778 (86.58%) |
+| Creatinine | 25,484 (26.98%) | 68,974 (73.02%) |
+| WBC | 26,781 (28.35%) | 67,677 (71.65%) |
+| Platelets | 26,950 (28.53%) | 67,508 (71.47%) |
+| pH | 28,476 (30.15%) | 65,982 (69.85%) |
+| Oxygenation | 25,336 (26.82%) | 69,122 (73.18%) |
+
+There were 3,542 stays (3.75%) with all 20 component-score columns non-null. The
+median was six null components, and 34.07% of stays had exactly six. Completeness was
+3.97% for stays at least 24 hours and 2.91% for shorter stays; both strata had a median
+of six null components. The small difference is expected because the physiology window
+is only two hours and does not expand with ICU duration.
+
+This 3.75% metric still overstates completeness relative to the original SAPS III data
+definition: unavailable context such as NYHA IV, cancer therapy, admission planning,
+and pre-sedation GCS is not represented as a null component score. Its availability is
+reported separately.
+
+## 2.6 Proxy and availability prevalence
+
+| Audit field | Result | Interpretation |
+|---|---:|---|
+| Diagnosis variables are post-hoc proxies | 94,458 (100%) | All diagnosis-derived context must be interpreted as a proxy |
+| Mechanical-ventilation proxy true | 17,446 (18.47%) | Audited ventilator-setting evidence in the admission window |
+| Planned-ICU proxy true | 2,316 (2.45%) | Proxy-classified planned admission, not direct observation of a >=12 h decision |
+| Pre-ICU vasoactive proxy true | 82 (0.087%) | Very low prevalence likely reflects incomplete pre-ICU capture in ICU `inputevents` |
+| NYHA IV available | 0 (0%) | Original variable unavailable and assigned reference points |
+| Cancer therapy available | 0 (0%) | Original variable unavailable and assigned reference points |
+| Pre-sedation GCS available | 0 (0%) | Original variable unavailable; charted contemporaneous GCS is used when complete |
+
+The low vasoactive prevalence should not be interpreted as evidence that only 82
+patients received qualifying therapy. It primarily demonstrates the limitations of
+using ICU input-event records to recover treatment before ICU admission.
+
+## 2.7 Missing-value semantics and limitations
+
+The adapted total starts with the published 16-point ICU-admission offset, adds all
+available component scores, and uses zero for null component contributions. Negative
+published categories can reduce the total below 16. Original null component fields are
+retained for audit.
+
+The principal limitations are:
+
+- 96.25% of stays lack at least one recorded component score, mainly because the
+  physiology window is only two hours.
+- Missing abnormal physiology contributes zero and can lower the total and probability.
+- Context components being non-null does not establish that their original clinical
+  facts were available.
+- NYHA IV, cancer therapy, and pre-sedation GCS are unavailable for every stay.
+- Planned admission, admission reason, surgical planning, infection acquisition, and
+  pre-ICU vasoactive treatment cannot be reconstructed exactly.
+- Diagnosis proxies use information coded over the hospital encounter and may include
+  facts documented after ICU admission, creating possible information leakage.
+- Procedure dates lack the timestamps needed for the original scheduling rule.
+- Automated high-frequency data and proxy logic differ from manual SAPS III abstraction.
+- Neither probability equation has been validated or recalibrated for these adapted
+  MIMIC-IV inputs.
+
+For these reasons, this output should always be called `SAPS III adapted`, never
+“official SAPS III.” It is appropriate for transparent research comparisons and
+sensitivity analyses, but it is not a drop-in clinical implementation.
+
+## 2.8 Deployment and reproducibility
+
+The full run used:
+
+| Property | Value |
+|---|---|
+| SLURM job | `2808999` (`saps3a-full`) |
+| Partition | `c23ms` |
+| CPUs | 8 |
+| Requested memory | 32 GiB |
+| DuckDB memory limit | 24 GB |
+| Observed peak resident memory | approximately 5.42 GiB |
+| Manifest elapsed time | 133.11 seconds |
+| MIMIC version | 3.1 |
+| Adaptation/item manifest | `saps-iii-adapted-v1` |
+
+The largest scans were `chartevents` (432,997,491 source rows; 715,748 retained; 71.16
+seconds) and `labevents` (158,374,764 source rows; 146,506 retained; 45.34 seconds).
+Only 1,184 of 10,953,713 `inputevents` rows met the cohort, item, and pre-ICU context
+filters. The final output passed validation with 94,458 unique, non-null stays.
+
+Primary outputs are under:
+
+```text
+outputs/full/saps_iii_adapted/
+  scores.parquet
+  score_missingness.parquet
+  component_missingness.csv
+  coverage.json
+  staging_statistics.json
+  run_manifest.json
+```
+
+The resumable full job is `slurm/run_saps_iii_adapted_full.slurm`. It requires
+`CONFIRM_FULL=YES`, uses a database and spill directory separate from SAPS II, and
+validates cohort, source, code, SQL, and item-manifest identity before reusing state.
+
+---
+
+# 3. Interpretation and downstream use
+
+For either score:
+
+1. Keep the component columns and `score_missingness.parquet` available during
+   analysis; do not treat a populated total as evidence of complete measurement.
+2. Report missingness by component and, where relevant, by ICU-duration stratum.
+3. Do not substitute one probability column for an observed mortality outcome.
+4. Do not compare raw SAPS II and SAPS III totals as though they share a scale.
+5. Use `stay_id` as the join key and expect repeated patients or admissions when they
+   contain multiple ICU stays.
+6. Preserve the run manifest with every analytical export so the exact cohort, code,
+   source, and SQL identity remain traceable.
+7. Treat patient-level score files, cohort allowlists, databases, logs, and copied
+   outputs as protected MIMIC-derived data.
+
+For implementation-level details, see
+[`saps_ii.md`](saps_ii.md) and
+[`saps_iii_adapted.md`](saps_iii_adapted.md).
+
+## Document provenance
+
+This report was generated from the validated full-cohort `run_manifest.json`,
+`scores.parquet`, and `score_missingness.parquet` aggregates for both scores on
+2026-08-07. Cross-score validation confirmed equal row counts and equal ordered cohort
+hashes. No patient-level identifiers are reproduced in this document.

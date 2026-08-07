@@ -17,6 +17,7 @@ tmp/
 
 # Downloaded vendor metadata (vendored source files remain tracked)
 vendor/**/.git/
+vendor/saps-iii-sources/
 
 # Environments and Python tooling
 .venv/
@@ -35,4 +36,3 @@ build/
 # OS/editor files
 .DS_Store
 *.swp
-

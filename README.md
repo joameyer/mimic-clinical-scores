@@ -2,8 +2,9 @@
 
 This project computes clinical severity scores from raw MIMIC-IV with a protected
 stay-ID allowlist, filtered DuckDB staging, immutable official SQL, resumable state,
-and auditable exports. The first implemented score is SAPS II. APS III and other
-scores are intentionally not implemented yet.
+and auditable exports. It implements official MIT-LCP SAPS II, an explicitly named
+MIMIC-IV adaptation of SAPS III, and a documented classic first-day SOFA adaptation.
+APS III and SOFA-2 are not implemented.
 
 The default operational workflow is the 100-stay HPC integration run. Local work is
 limited to metadata-only preflight, cohort sampling, and synthetic/demo tests. Never
@@ -30,6 +31,18 @@ src/mimic_clinical_scores/
     staging_rules.py   score-specific raw retention rules
     scoring.py         score output projection
     itemid_manifest.v1.json
+  scores/saps_iii_adapted/
+    specification.py   raw dependencies and adaptation identity
+    staging_rules.py   inclusive admission-window retention rules
+    saps_iii_adapted.sql
+    reference.py       independent point/equation checks
+    itemid_manifest.v1.json
+  scores/sofa_first_day_adapted/
+    specification.py   pinned classic SOFA dependencies and identity
+    staging_rules.py   first-day and episode-context retention rules
+    sofa_first_day_adapted.sql
+    scoring.py         score, evidence, and missingness projections
+    itemid_manifest.v1.json
 ```
 
 The shared layer owns cohort validation, raw lookup, DuckDB settings, staging,
@@ -37,6 +50,33 @@ resumption, provenance, exports, coverage, missingness, and cluster mechanics. S
 owns its official version, concepts, components, raw dependencies, item IDs, context
 rules, and score documentation. A future score supplies the small `ScoreSpecification`
 contract and its own staging declaration; it does not reimplement the shared pipeline.
+Select it with `--score saps_ii` (the backward-compatible default) or
+`--score saps_iii_adapted`, or `--score sofa_first_day_adapted`.
+
+## Classic first-day SOFA adapted
+
+`sofa_first_day_adapted` produces one classic SOFA row per ICU stay. It executes
+pinned MIT-LCP measurement, ventilation, and vasopressor concepts and applies the
+classic six 0–4 organ-component thresholds. It restores the ventilated P/F 200–399
+branches missing from the legacy MIT first-day query and uses equivalent narrow
+first-day aggregates rather than the broad general-purpose first-day lab table. The
+adaptations, time windows, source mapping, missingness semantics, and cluster commands
+are documented in the [SOFA audit](docs/scores/sofa_first_day_adapted.md). Classic
+SOFA has no direct mortality-probability output.
+
+## SAPS III adapted
+
+MIT-LCP/mimic-code v3.0.1 contains no SAPS III concept, so this project does not call
+the new result official. `saps_iii_adapted` retains the 2005 point cut-offs, global
+mortality equation, and North American equation, but uses versioned, visible MIMIC
+proxies for facts structured MIMIC-IV cannot recover exactly. These include planned
+ICU admission, the stated admission reason, surgery planning, infection acquisition,
+NYHA IV, recent cancer therapy, pre-sedation GCS, and complete pre-ICU vasoactive
+therapy. See the full [source and adaptation audit](docs/scores/saps_iii_adapted.md).
+
+SAPS III physiology uses the inclusive interval
+`[intime - 1 hour, intime + 1 hour]`, not the SAPS II first-day window. It therefore
+has separate filtered staging and cannot reuse a SAPS II DuckDB database.
 
 No code or configuration is imported from the previous mortality project. The blocked
 `static.parquet` is read only by `prepare-cohort`, and only its `stay_id` column is
@@ -201,6 +241,11 @@ score or scan complete event contents:
 `--verify-raw-checksums` is optional and intentionally expensive: it streams each raw
 file only to hash bytes, still without parsing or scoring clinical values.
 
+For another score, add `--score saps_iii_adapted` or
+`--score sofa_first_day_adapted`. The latter validates five raw files, the pinned
+MIT-LCP SQL subset, adaptation manifest, project SQL, and item-ID audit without
+scanning clinical contents.
+
 Run correctness tests entirely on synthetic data:
 
 ```zsh
@@ -255,6 +300,48 @@ Submit the default development job:
 cd /hpcwork/jrc_combine/joana/mimic-clinical-scores
 sbatch slurm/run_dev100.slurm
 ```
+
+After deploying the adapted SAPS III code, its separate 100-stay integration is:
+
+```zsh
+cd /hpcwork/jrc_combine/joana/mimic-clinical-scores
+mkdir -p logs/dev100/saps_iii_adapted
+./.venv/bin/python -m mimic_clinical_scores preflight \
+  --score saps_iii_adapted \
+  --mode dev100 \
+  --project-root "$PWD" \
+  --mimic-root /hpcwork/jrc_combine/joana/mimic/data \
+  --log-dir "$PWD/logs/dev100/saps_iii_adapted"
+sbatch --partition=c23ms slurm/run_saps_iii_adapted_dev100.slurm
+```
+
+That job has independent `work/dev100/saps_iii_adapted.duckdb`,
+`outputs/dev100/saps_iii_adapted`, and `logs/dev100/saps_iii_adapted` paths. Its
+20-minute limit includes ample margin over the earlier four-minute SAPS II dev100 raw
+scan while adding transfers, procedures, and input events. The limit is not an
+expected duration.
+
+After the validated dev100 run, submit SAPS III adapted for every ICU stay with its
+separate, deliberately gated full script:
+
+```zsh
+cd /hpcwork/jrc_combine/joana/mimic-clinical-scores
+mkdir -p logs/full/saps_iii_adapted
+JOB_ID=$(sbatch --parsable --partition=c23ms \
+  --export=ALL,CONFIRM_FULL=YES \
+  slurm/run_saps_iii_adapted_full.slurm)
+echo "$JOB_ID"
+squeue -j "$JOB_ID"
+```
+
+It reuses the protected all-ICU allowlist when present, requests 8 CPUs, 32 GB and 30
+minutes, and writes only under the SAPS III adapted full paths. See the
+[SAPS III adapted audit](docs/scores/saps_iii_adapted.md) for monitoring and resume
+details.
+
+The validated full-cohort definitions, missingness summaries, deployment records, and
+interpretation limitations for both scores are consolidated in the
+[full-cohort score report](docs/scores/full_cohort_score_report.md).
 
 The development script requests 4 CPUs, 24 GB RAM, and a two-hour maximum wall
 time, with DuckDB limited to 12 GB. The cohort contains only 100 ICU stays, but the
@@ -375,5 +462,6 @@ job; use the final validation JSON, `sacct` state, and exit code to determine su
 Known limitations: the demo is MIMIC-IV v2.2 because no v3.1 demo is published; the
 real-data integrations were run only on the HPC cluster, never locally; and v3.0.1's clinical
 choices—including a fixed 24-hour window beyond ICU discharge and its service
-ordering—are preserved even when they may be surprising. APS III and SAPS 3 are not yet
-implemented.
+ordering—are preserved even when they may be surprising. SAPS III adapted has no
+MIT-LCP reference SQL and cannot reconstruct several original admission-time facts;
+its proxy flags and documentation must accompany analysis. APS III is not implemented.

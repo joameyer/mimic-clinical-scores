@@ -1,0 +1,32 @@
+{
+  "manifest_version": "saps-iii-adapted-v1",
+  "entries": [
+    {"raw_table":"mimiciv_icu.chartevents","item_id":220045,"clinical_meaning":"Heart rate","time_context":"inclusive +/-1 hour","reason":"highest heart rate"},
+    {"raw_table":"mimiciv_icu.chartevents","item_id":220050,"clinical_meaning":"Arterial systolic blood pressure","time_context":"inclusive +/-1 hour","reason":"lowest systolic pressure"},
+    {"raw_table":"mimiciv_icu.chartevents","item_id":220179,"clinical_meaning":"Non-invasive systolic blood pressure","time_context":"inclusive +/-1 hour","reason":"lowest systolic pressure"},
+    {"raw_table":"mimiciv_icu.chartevents","item_id":225309,"clinical_meaning":"Arterial systolic blood pressure","time_context":"inclusive +/-1 hour","reason":"lowest systolic pressure"},
+    {"raw_table":"mimiciv_icu.chartevents","item_id":223761,"clinical_meaning":"Temperature Fahrenheit","time_context":"inclusive +/-1 hour","reason":"highest temperature, converted to Celsius"},
+    {"raw_table":"mimiciv_icu.chartevents","item_id":223762,"clinical_meaning":"Temperature Celsius","time_context":"inclusive +/-1 hour","reason":"highest temperature"},
+    {"raw_table":"mimiciv_icu.chartevents","item_id":220739,"clinical_meaning":"GCS eye","time_context":"inclusive +/-1 hour","reason":"estimated lowest GCS"},
+    {"raw_table":"mimiciv_icu.chartevents","item_id":223900,"clinical_meaning":"GCS verbal","time_context":"inclusive +/-1 hour","reason":"estimated lowest GCS"},
+    {"raw_table":"mimiciv_icu.chartevents","item_id":223901,"clinical_meaning":"GCS motor","time_context":"inclusive +/-1 hour","reason":"estimated lowest GCS"},
+    {"raw_table":"mimiciv_icu.chartevents","item_id":223835,"clinical_meaning":"Inspired oxygen fraction","time_context":"intime-3h through intime+1h, allowing a 2h preceding lookback for gases at the start boundary","reason":"P/F ratio contextual pairing"},
+    {"raw_table":"mimiciv_icu.chartevents","item_id":223848,"clinical_meaning":"Ventilator type","time_context":"inclusive +/-1 hour","reason":"mechanical ventilation proxy"},
+    {"raw_table":"mimiciv_icu.chartevents","item_id":223849,"clinical_meaning":"Ventilator mode","time_context":"inclusive +/-1 hour","reason":"mechanical ventilation proxy"},
+    {"raw_table":"mimiciv_icu.chartevents","item_id":224684,"clinical_meaning":"Set tidal volume","time_context":"inclusive +/-1 hour","reason":"mechanical ventilation proxy"},
+    {"raw_table":"mimiciv_icu.chartevents","item_id":224688,"clinical_meaning":"Set respiratory rate","time_context":"inclusive +/-1 hour","reason":"mechanical ventilation proxy"},
+    {"raw_table":"mimiciv_icu.chartevents","item_id":224690,"clinical_meaning":"Total respiratory rate","time_context":"inclusive +/-1 hour","reason":"mechanical ventilation proxy"},
+    {"raw_table":"mimiciv_icu.chartevents","item_id":229314,"clinical_meaning":"Hamilton ventilator mode","time_context":"inclusive +/-1 hour","reason":"mechanical ventilation proxy"},
+    {"raw_table":"mimiciv_hosp.labevents","item_id":50816,"clinical_meaning":"Blood-gas FiO2","time_context":"inclusive +/-1 hour","reason":"P/F ratio"},
+    {"raw_table":"mimiciv_hosp.labevents","item_id":50820,"clinical_meaning":"Blood-gas pH","time_context":"inclusive +/-1 hour","reason":"lowest pH"},
+    {"raw_table":"mimiciv_hosp.labevents","item_id":50821,"clinical_meaning":"Blood-gas PaO2","time_context":"inclusive +/-1 hour","reason":"oxygenation"},
+    {"raw_table":"mimiciv_hosp.labevents","item_id":50885,"clinical_meaning":"Total bilirubin","time_context":"inclusive +/-1 hour","reason":"highest bilirubin"},
+    {"raw_table":"mimiciv_hosp.labevents","item_id":50912,"clinical_meaning":"Creatinine","time_context":"inclusive +/-1 hour","reason":"highest creatinine"},
+    {"raw_table":"mimiciv_hosp.labevents","item_id":51265,"clinical_meaning":"Platelet count","time_context":"inclusive +/-1 hour","reason":"lowest platelets"},
+    {"raw_table":"mimiciv_hosp.labevents","item_id":51301,"clinical_meaning":"White blood cells","time_context":"inclusive +/-1 hour","reason":"lowest WBC, as specified by the SAPS III score sheet"},
+    {"raw_table":"mimiciv_icu.inputevents","item_id":221289,"clinical_meaning":"Epinephrine","time_context":"overlap in prior 24 hours","reason":"vasoactive therapy proxy"},
+    {"raw_table":"mimiciv_icu.inputevents","item_id":221653,"clinical_meaning":"Dobutamine","time_context":"overlap in prior 24 hours","reason":"vasoactive therapy proxy"},
+    {"raw_table":"mimiciv_icu.inputevents","item_id":221662,"clinical_meaning":"Dopamine","time_context":"overlap in prior 24 hours","reason":"vasoactive therapy proxy; rate >=5 mcg/kg/min"},
+    {"raw_table":"mimiciv_icu.inputevents","item_id":221906,"clinical_meaning":"Norepinephrine","time_context":"overlap in prior 24 hours","reason":"vasoactive therapy proxy"}
+  ]
+}

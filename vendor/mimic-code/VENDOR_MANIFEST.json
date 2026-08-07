@@ -3,7 +3,8 @@
   "release": "v3.0.1",
   "commit": "c7e07560dc847e32cbb0b2890213e8e7cbd8bc7e",
   "manifest": "../../config/official_sources.json",
-  "adaptations": [],
-  "note": "Files listed by config/official_sources.json are byte-for-byte upstream files; official DuckDB SQL is executed unchanged."
+  "adaptations": [
+    "Project-owned SOFA score SQL is outside vendor/mimic-code and documented in config/sofa_sources.json."
+  ],
+  "note": "Files listed by config/official_sources.json are byte-for-byte upstream files; vendored DuckDB concepts are executed unchanged."
 }
-

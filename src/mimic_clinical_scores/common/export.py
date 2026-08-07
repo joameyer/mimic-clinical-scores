@@ -19,11 +19,8 @@ from mimic_clinical_scores.common.provenance import (
     utc_now,
 )
 from mimic_clinical_scores.common.staging import staging_statistics
-from mimic_clinical_scores.scores.saps_ii.scoring import (
-    missingness_projection_sql,
-    scores_projection_sql,
-)
-from mimic_clinical_scores.scores.saps_ii.specification import COMPONENT_COLUMNS, SAPSII_SPEC
+from mimic_clinical_scores.scores.saps_ii.specification import SAPSII_SPEC
+from mimic_clinical_scores.common.specification import ScoreSpecification
 
 
 class ExportError(RuntimeError):
@@ -86,29 +83,60 @@ def _coverage_metric(observed: int, denominator: int) -> dict[str, Any]:
     }
 
 
-def calculate_coverage(connection: duckdb.DuckDBPyConnection) -> dict[str, Any]:
-    components_complete = " AND ".join(f"{column} IS NOT NULL" for column in COMPONENT_COLUMNS)
+def calculate_coverage(
+    connection: duckdb.DuckDBPyConnection,
+    specification: ScoreSpecification = SAPSII_SPEC,
+) -> dict[str, Any]:
+    components_complete = " AND ".join(
+        f"{column} IS NOT NULL" for column in specification.component_columns
+    )
+    score_column = specification.score_columns[0]
+    probability_column = (
+        specification.probability_columns[0] if specification.probability_columns else None
+    )
     base = f"""
         SELECT s.*, DATE_DIFF('microseconds', i.intime, i.outtime) / 3600000000.0 < 24.0 AS short
-        FROM mimiciv_derived.sapsii s
+        FROM {specification.score_table} s
         INNER JOIN mimiciv_icu.icustays i USING (stay_id)
     """
 
     def one(where: str = "TRUE") -> dict[str, Any]:
+        probability_select = (
+            f"COUNT(*) FILTER (WHERE {probability_column} IS NOT NULL)"
+            if probability_column else "NULL"
+        )
         row = connection.execute(
             f"""
             SELECT COUNT(*) AS rows,
-                   COUNT(*) FILTER (WHERE sapsii IS NOT NULL) AS score_rows,
-                   COUNT(*) FILTER (WHERE sapsii_prob IS NOT NULL) AS probability_rows,
+                   COUNT(*) FILTER (WHERE {score_column} IS NOT NULL) AS score_rows,
+                   {probability_select} AS probability_rows,
                    COUNT(*) FILTER (WHERE {components_complete}) AS complete_rows
             FROM ({base}) coverage WHERE {where}
             """
         ).fetchone()
-        total, score, probability, complete = map(int, row)
+        total, score, probability, complete = row
+        total, score, complete = int(total), int(score), int(complete)
+        probability_by_column = {
+            column: _coverage_metric(
+                int(
+                    connection.execute(
+                        f"SELECT COUNT(*) FILTER (WHERE {column} IS NOT NULL) "
+                        f"FROM ({base}) coverage WHERE {where}"
+                    ).fetchone()[0]
+                ),
+                total,
+            )
+            for column in specification.probability_columns
+        }
         return {
             "cohort_rows": total,
             "score_coverage": _coverage_metric(score, total),
-            "probability_coverage": _coverage_metric(probability, total),
+            "probability_coverage": (
+                _coverage_metric(int(probability), total)
+                if probability is not None
+                else {"count": None, "percentage": None, "applicable": False}
+            ),
+            "probability_coverage_by_column": probability_by_column,
             "complete_component_coverage": _coverage_metric(complete, total),
             "any_component_missing_coverage": _coverage_metric(total - complete, total),
         }
@@ -134,19 +162,22 @@ def calculate_coverage(connection: duckdb.DuckDBPyConnection) -> dict[str, Any]:
     return overall
 
 
-def component_missingness_rows(connection: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
+def component_missingness_rows(
+    connection: duckdb.DuckDBPyConnection,
+    specification: ScoreSpecification = SAPSII_SPEC,
+) -> list[dict[str, Any]]:
     strata = {
         "all": "TRUE",
         "shorter_than_24h": "DATE_DIFF('microseconds', i.intime, i.outtime) / 3600000000.0 < 24.0",
         "at_least_24h": "DATE_DIFF('microseconds', i.intime, i.outtime) / 3600000000.0 >= 24.0",
     }
     rows: list[dict[str, Any]] = []
-    for component in COMPONENT_COLUMNS:
+    for component in specification.component_columns:
         for stratum, predicate in strata.items():
             cohort_size, observed = connection.execute(
                 f"""
                 SELECT COUNT(*), COUNT(s.{component})
-                FROM mimiciv_derived.sapsii s
+                FROM {specification.score_table} s
                 INNER JOIN mimiciv_icu.icustays i USING (stay_id)
                 WHERE {predicate}
                 """
@@ -186,6 +217,7 @@ def export_all(
     preflight: dict[str, Any],
     runtime: DuckDBSettings,
     command_line: list[str] | None = None,
+    specification: ScoreSpecification = SAPSII_SPEC,
 ) -> dict[str, Any]:
     _prepare_output_directory(output_directory, identity_hash)
     scores_path = output_directory / "scores.parquet"
@@ -195,17 +227,17 @@ def export_all(
     staging_path = output_directory / "staging_statistics.json"
     manifest_path = output_directory / "run_manifest.json"
 
-    _atomic_copy_parquet(connection, scores_projection_sql(), scores_path)
-    _atomic_copy_parquet(connection, missingness_projection_sql(), missingness_path)
+    _atomic_copy_parquet(connection, specification.scores_projection_sql(), scores_path)
+    _atomic_copy_parquet(connection, specification.missingness_projection_sql(), missingness_path)
     _atomic_write_csv(
         component_path,
         [
             "component", "short_stay_stratum", "cohort_size", "observed_count",
             "missing_count", "missing_percentage",
         ],
-        component_missingness_rows(connection),
+        component_missingness_rows(connection, specification),
     )
-    coverage = calculate_coverage(connection)
+    coverage = calculate_coverage(connection, specification)
     stats = staging_statistics(connection)
     atomic_write_json(coverage_path, coverage)
     atomic_write_json(staging_path, stats)
@@ -236,8 +268,12 @@ def export_all(
         "sample_seed": (cohort_manifest or {}).get("random_seed"),
         "selected_id_hash": (cohort_manifest or {}).get("ordered_selected_id_sha256"),
         "mimic_version": mimic_version,
-        "official_mimic_code_release": SAPSII_SPEC.mimic_code_release,
-        "official_mimic_code_commit": SAPSII_SPEC.mimic_code_commit,
+        "score_name": specification.name,
+        "score_provenance": specification.provenance_label,
+        "upstream_source_manifest": preflight["official"].get("adaptation_source_manifest"),
+        "upstream_source_manifest_sha256": preflight["official"].get("source_manifest_sha256"),
+        "official_mimic_code_release": specification.mimic_code_release,
+        "official_mimic_code_commit": specification.mimic_code_commit,
         "concept_dependency_order": preflight["official"]["dependency_order"],
         "sql_hashes": preflight["official"]["sql_hashes"],
         "vendor_hashes": preflight["official"]["vendor_hashes"],

@@ -11,7 +11,7 @@ def test_pinned_sources_and_recursive_graph(project_root) -> None:
     hashes = validate_official_sources(project_root)
     graph = audit_dependency_graph(project_root, load_itemid_manifest())
 
-    assert len(hashes) == 14
+    assert len(hashes) == 18
     assert graph["concept_dependency_order"][-1].endswith("score/sapsii.sql")
     assert set(graph["raw_tables"]) == {
         "mimiciv_hosp.admissions",
@@ -35,4 +35,3 @@ def test_item_manifest_records_required_audit_fields() -> None:
     }
     assert all(required <= set(entry) for entry in manifest["entries"])
     assert all(entry["clinical_meaning"] != "unknown" for entry in manifest["entries"])
-
