@@ -1,0 +1,35 @@
+{
+  "score": "ICU-relative hourly SOFA through day 14",
+  "adaptation_version": "sofa-hourly-14d-v1",
+  "mimic_code": {
+    "repository": "https://github.com/MIT-LCP/mimic-code.git",
+    "release": "v3.0.1",
+    "commit": "c7e07560dc847e32cbb0b2890213e8e7cbd8bc7e"
+  },
+  "official_hourly_sofa": {
+    "path": "mimic-iv/concepts_duckdb/score/sofa.sql",
+    "sha256": "5af9c75bdaeb9342138a0fbc8cbef33b132508689e3ac492ab574af1c7ff05b0"
+  },
+  "adaptations": [
+    {
+      "id": "icu-relative-hour-grid",
+      "description": "Replaces the upstream heart-rate-derived, wall-clock-aligned grid with one-hour intervals anchored exactly at raw icustays.intime. Hour 0 is (intime, intime+1h], with a partial final interval at discharge."
+    },
+    {
+      "id": "fourteen-day-cap",
+      "description": "Returns at most 336 output intervals (hour_index 0 through 335), ending sooner at raw ICU outtime. Null outtime is conservatively capped at 336 intervals."
+    },
+    {
+      "id": "explicit-component-missingness",
+      "description": "Retains nullable rolling component scores in *_24hours_raw while preserving upstream COALESCE(component,0) behavior in the reported components and total."
+    }
+  ],
+  "preserved_upstream_behavior": [
+    "Twenty-four pre-ICU internal hourly rows seed the trailing 24-hour windows; only non-negative hour_index rows are exported.",
+    "Hourly event intervals use starttime < charttime and endtime >= charttime.",
+    "Component scores use the maximum severity across the current and 23 preceding hourly rows.",
+    "Urine output accepts an official urine-output-rate window only when uo_tm_24hr is between 22 and 30 hours and scales it to 24 hours.",
+    "Arterial blood gases only are used for respiratory SOFA and ventilation status is evaluated at blood-gas charttime.",
+    "Missing rolling components contribute zero to sofa_hourly_24h; missingness is exported separately."
+  ]
+}

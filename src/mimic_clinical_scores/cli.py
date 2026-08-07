@@ -276,7 +276,8 @@ def _run_pipeline_command(args: argparse.Namespace) -> dict[str, Any]:
                 return {"identity": identity_hash, "outputs": manifest["output_paths"]}
 
         validation = validate_exports(
-            connection, output_directory=args.output_dir, identity_hash=identity_hash
+            connection, output_directory=args.output_dir, identity_hash=identity_hash,
+            specification=specification,
         )
         LOGGER.info("validation complete rows=%d", validation["cohort_rows"])
         return {"identity": identity_hash, "validation": validation}

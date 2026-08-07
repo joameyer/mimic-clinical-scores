@@ -88,9 +88,19 @@ def run_preflight(
                 f"Adapted SAPS III item-ID audit failed: SQL={sorted(observed_ids)} "
                 f"manifest={sorted(declared_ids)}"
             )
-    elif specification.name == "sofa_first_day_adapted":
+    elif specification.name in {"sofa_first_day_adapted", "sofa_hourly_14d"}:
         from mimic_clinical_scores.common.provenance import extract_item_ids, extract_table_references
-        from mimic_clinical_scores.scores.sofa_first_day_adapted.specification import load_itemid_manifest as load_sofa_items
+
+        if specification.name == "sofa_first_day_adapted":
+            from mimic_clinical_scores.scores.sofa_first_day_adapted.specification import load_itemid_manifest as load_sofa_items
+            source_filename = "sofa_sources.json"
+            expected_upstream_key = "official_first_day_sofa"
+            expected_upstream_hash = "02736bd4faf9885fed67de777ec85852b50e93ac1ddc03bd6e5039216ce3d86e"
+        else:
+            from mimic_clinical_scores.scores.sofa_hourly_14d.specification import load_itemid_manifest as load_sofa_items
+            source_filename = "sofa_hourly_14d_sources.json"
+            expected_upstream_key = "official_hourly_sofa"
+            expected_upstream_hash = "5af9c75bdaeb9342138a0fbc8cbef33b132508689e3ac492ab574af1c7ff05b0"
 
         item_manifest = load_sofa_items()
         sql_hashes = dict(specification.sql_hashes(project_root))
@@ -103,7 +113,7 @@ def run_preflight(
             table for table, relative in RAW_TABLE_TO_FILE.items()
             if relative in specification.required_raw_tables
         )
-        source_path = project_root / "config" / "sofa_sources.json"
+        source_path = project_root / "config" / source_filename
         if not source_path.is_file():
             raise ProvenanceError(f"SOFA source manifest is missing: {source_path}")
         source_manifest = json.loads(source_path.read_text(encoding="utf-8"))
@@ -163,9 +173,11 @@ def run_preflight(
                     f"SOFA item manifest SQL hash mismatch for {concept_name}: "
                     f"{entry['sql_sha256']} != {observed_hash_by_concept.get(concept_name)}"
                 )
-        expected_upstream_hash = source_manifest["official_first_day_sofa"]["sha256"]
-        if expected_upstream_hash != "02736bd4faf9885fed67de777ec85852b50e93ac1ddc03bd6e5039216ce3d86e":
-            raise ProvenanceError("Unexpected pinned upstream first-day SOFA hash")
+        observed_upstream_hash = source_manifest[expected_upstream_key]["sha256"]
+        if observed_upstream_hash != expected_upstream_hash:
+            raise ProvenanceError(
+                f"Unexpected pinned upstream SOFA hash: {observed_upstream_hash}"
+            )
     else:
         raise ProvenanceError(f"No preflight implementation for score {specification.name}")
     expected_files = set(specification.required_raw_tables)

@@ -1,0 +1,151 @@
+{
+  "manifest_version": "sofa-hourly-14d-v1",
+  "upstream_release": "v3.0.1",
+  "upstream_commit": "c7e07560dc847e32cbb0b2890213e8e7cbd8bc7e",
+  "entries": [
+    {
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef",
+      "raw_table": "mimiciv_hosp.labevents",
+      "item_ids": [50801, 50802, 50803, 50804, 50805, 50806, 50807, 50808, 50809, 50810, 50811, 50813, 50814, 50815, 50816, 50817, 50818, 50819, 50820, 50821, 50822, 50823, 50824, 50825, 52033],
+      "clinical_meaning": "complete official blood-gas concept item set",
+      "required_time_context": "intime-24h through discharge or intime+336h",
+      "reason_for_retention": "hourly arterial PaO2/FiO2"
+    },
+    {
+      "source_concept": "measurement/bg.sql",
+      "sql_sha256": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef",
+      "raw_table": "mimiciv_icu.chartevents",
+      "item_ids": [220277, 223835],
+      "clinical_meaning": "SpO2 and inspired oxygen fraction",
+      "required_time_context": "full selected-stay context",
+      "reason_for_retention": "official preceding FiO2/SpO2 matching"
+    },
+    {
+      "source_concept": "measurement/chemistry.sql",
+      "sql_sha256": "6f509898b49735bb476fcf18986c35fae44c0a388b789cf14ce6df7d425dc640",
+      "raw_table": "mimiciv_hosp.labevents",
+      "item_ids": [50862, 50868, 50882, 50893, 50902, 50912, 50930, 50931, 50971, 50976, 50983, 51006],
+      "clinical_meaning": "official chemistry concept; creatinine contributes",
+      "required_time_context": "intime-24h through discharge or intime+336h",
+      "reason_for_retention": "renal SOFA"
+    },
+    {
+      "source_concept": "measurement/complete_blood_count.sql",
+      "sql_sha256": "d5de5c0f8df5d58a726526811240bb13bf775f1319acf1da24df14368995001a",
+      "raw_table": "mimiciv_hosp.labevents",
+      "item_ids": [51221, 51222, 51248, 51249, 51250, 51265, 51277, 51279, 51301, 52159],
+      "clinical_meaning": "official CBC concept; platelets contribute",
+      "required_time_context": "intime-24h through discharge or intime+336h",
+      "reason_for_retention": "coagulation SOFA"
+    },
+    {
+      "source_concept": "measurement/enzyme.sql",
+      "sql_sha256": "19372275662b2330963902cc19dd96b295d61d4db7145de52f7ee36ac9fdd927",
+      "raw_table": "mimiciv_hosp.labevents",
+      "item_ids": [50861, 50863, 50867, 50878, 50883, 50884, 50885, 50910, 50911, 50927, 50954],
+      "clinical_meaning": "official enzyme concept; bilirubin contributes",
+      "required_time_context": "intime-24h through discharge or intime+336h",
+      "reason_for_retention": "liver SOFA"
+    },
+    {
+      "source_concept": "measurement/gcs.sql",
+      "sql_sha256": "c9240ecf40b2fd6fd6844f209a1f493b73e899bbec2c872809affb5c353c7478",
+      "raw_table": "mimiciv_icu.chartevents",
+      "item_ids": [220739, 223900, 223901],
+      "clinical_meaning": "GCS eye, verbal, and motor components",
+      "required_time_context": "full selected-stay context",
+      "reason_for_retention": "preserve official GCS component reconstruction"
+    },
+    {
+      "source_concept": "measurement/oxygen_delivery.sql",
+      "sql_sha256": "0a381c174ec508f826f1aa02edcede89be2376c302a6580b3ddfe483cffe48e0",
+      "raw_table": "mimiciv_icu.chartevents",
+      "item_ids": [223834, 226732, 227287, 227582],
+      "clinical_meaning": "oxygen delivery devices and flow",
+      "required_time_context": "full selected-stay context",
+      "reason_for_retention": "ventilation episode construction"
+    },
+    {
+      "source_concept": "measurement/urine_output.sql",
+      "sql_sha256": "bf9605e4ea7bcae0e8c44768ca1abce8a098ff3a0b44bfaffcbb2be157216611",
+      "raw_table": "mimiciv_icu.outputevents",
+      "item_ids": [226557, 226558, 226559, 226560, 226561, 226563, 226564, 226565, 226567, 226584, 227488, 227489],
+      "clinical_meaning": "official urine-output item set",
+      "required_time_context": "intime-48h through discharge or intime+336h",
+      "reason_for_retention": "nested hourly and 24-hour renal lookback"
+    },
+    {
+      "source_concept": "demographics/weight_durations.sql",
+      "sql_sha256": "c7116bdc932bc39e8b70aed98a7ada1f6a4a0cdd79ea4730aa3824340100c6c7",
+      "raw_table": "mimiciv_icu.chartevents",
+      "item_ids": [224639, 226512],
+      "clinical_meaning": "daily and admission weights",
+      "required_time_context": "full selected-stay context",
+      "reason_for_retention": "execute official weight-duration dependency unchanged"
+    },
+    {
+      "source_concept": "measurement/urine_output_rate.sql",
+      "sql_sha256": "a4b777efb97b3244e56a24ee38500793af89882d21c56ce1da06b71b136cad0f",
+      "raw_table": "mimiciv_icu.chartevents",
+      "item_ids": [220045],
+      "clinical_meaning": "heart-rate charting bounds used by official urine-output-rate concept",
+      "required_time_context": "full selected-stay context",
+      "reason_for_retention": "preserve first urine interval duration"
+    },
+    {
+      "source_concept": "measurement/ventilator_setting.sql",
+      "sql_sha256": "6a6938a619d46d9be0ee6d2203e294abdda4b2782ecf1b5e90a3a393378e8dc7",
+      "raw_table": "mimiciv_icu.chartevents",
+      "item_ids": [220339, 223835, 223848, 223849, 224684, 224685, 224686, 224687, 224688, 224689, 224690, 224691, 224696, 224700, 229314],
+      "clinical_meaning": "official ventilator settings",
+      "required_time_context": "full selected-stay context",
+      "reason_for_retention": "construct ventilation episodes at hourly blood gases"
+    },
+    {
+      "source_concept": "measurement/vitalsign.sql",
+      "sql_sha256": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97",
+      "raw_table": "mimiciv_icu.chartevents",
+      "item_ids": [220045, 220050, 220051, 220052, 220179, 220180, 220181, 220210, 220277, 220621, 223761, 223762, 224642, 224690, 225309, 225310, 225312, 225664, 226537],
+      "clinical_meaning": "official vital-sign set; MAP contributes",
+      "required_time_context": "intime-24h through discharge or intime+336h except shared full-context IDs",
+      "reason_for_retention": "cardiovascular SOFA"
+    },
+    {
+      "source_concept": "medication/dobutamine.sql",
+      "sql_sha256": "f514b7e2ade37032e98c51ba82bf592244d1f1d5384b63b541d455f957b33df0",
+      "raw_table": "mimiciv_icu.inputevents",
+      "item_ids": [221653],
+      "clinical_meaning": "dobutamine infusion",
+      "required_time_context": "infusion overlap with internal hourly grid",
+      "reason_for_retention": "cardiovascular SOFA"
+    },
+    {
+      "source_concept": "medication/dopamine.sql",
+      "sql_sha256": "75284fe0209c7a19b0c859d11d2658e56385430bad38c9aaa75174667ea861ec",
+      "raw_table": "mimiciv_icu.inputevents",
+      "item_ids": [221662],
+      "clinical_meaning": "dopamine infusion",
+      "required_time_context": "infusion overlap with internal hourly grid",
+      "reason_for_retention": "cardiovascular SOFA"
+    },
+    {
+      "source_concept": "medication/epinephrine.sql",
+      "sql_sha256": "b021cd639961440438faa0e0573363b35be10f3c2b9c8da041b79e1431d470a0",
+      "raw_table": "mimiciv_icu.inputevents",
+      "item_ids": [221289],
+      "clinical_meaning": "epinephrine infusion",
+      "required_time_context": "infusion overlap with internal hourly grid",
+      "reason_for_retention": "cardiovascular SOFA"
+    },
+    {
+      "source_concept": "medication/norepinephrine.sql",
+      "sql_sha256": "4085001f87dcdeeccde5877eb0dd3cc9718c7a8aab2bb57c2a6ab41c063ffabd",
+      "raw_table": "mimiciv_icu.inputevents",
+      "item_ids": [221906],
+      "clinical_meaning": "norepinephrine infusion with official rate normalization",
+      "required_time_context": "infusion overlap with internal hourly grid",
+      "reason_for_retention": "cardiovascular SOFA"
+    }
+  ]
+}

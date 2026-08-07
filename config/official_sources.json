@@ -23,6 +23,7 @@
     "LICENSE": "fa5b4187cc5da20dc4f27d76d59c8507d1389a76559b5f56ab48a222d1eb3bb5",
     "mimic-iv/concepts/score/sapsii.sql": "4e4edd9569e3db4432d99ebe3c7e01a7507d7a73be74186ae038c9b58b7410fe",
     "mimic-iv/concepts_duckdb/demographics/age.sql": "6316e9ce5f6a9b81f76fff1b891eb014287603e59e24e5704a59195819d06bfc",
+    "mimic-iv/concepts_duckdb/demographics/weight_durations.sql": "c7116bdc932bc39e8b70aed98a7ada1f6a4a0cdd79ea4730aa3824340100c6c7",
     "mimic-iv/concepts_duckdb/measurement/bg.sql": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef",
     "mimic-iv/concepts_duckdb/measurement/chemistry.sql": "6f509898b49735bb476fcf18986c35fae44c0a388b789cf14ce6df7d425dc640",
     "mimic-iv/concepts_duckdb/measurement/complete_blood_count.sql": "d5de5c0f8df5d58a726526811240bb13bf775f1319acf1da24df14368995001a",
@@ -30,6 +31,7 @@
     "mimic-iv/concepts_duckdb/measurement/gcs.sql": "c9240ecf40b2fd6fd6844f209a1f493b73e899bbec2c872809affb5c353c7478",
     "mimic-iv/concepts_duckdb/measurement/oxygen_delivery.sql": "0a381c174ec508f826f1aa02edcede89be2376c302a6580b3ddfe483cffe48e0",
     "mimic-iv/concepts_duckdb/measurement/urine_output.sql": "bf9605e4ea7bcae0e8c44768ca1abce8a098ff3a0b44bfaffcbb2be157216611",
+    "mimic-iv/concepts_duckdb/measurement/urine_output_rate.sql": "a4b777efb97b3244e56a24ee38500793af89882d21c56ce1da06b71b136cad0f",
     "mimic-iv/concepts_duckdb/measurement/ventilator_setting.sql": "6a6938a619d46d9be0ee6d2203e294abdda4b2782ecf1b5e90a3a393378e8dc7",
     "mimic-iv/concepts_duckdb/measurement/vitalsign.sql": "fb8c2060ae861dd90c6b342879f07c5629639cd8bf229b7a450062a380561a97",
     "mimic-iv/concepts_duckdb/medication/dobutamine.sql": "f514b7e2ade37032e98c51ba82bf592244d1f1d5384b63b541d455f957b33df0",
@@ -37,6 +39,7 @@
     "mimic-iv/concepts_duckdb/medication/epinephrine.sql": "b021cd639961440438faa0e0573363b35be10f3c2b9c8da041b79e1431d470a0",
     "mimic-iv/concepts_duckdb/medication/norepinephrine.sql": "4085001f87dcdeeccde5877eb0dd3cc9718c7a8aab2bb57c2a6ab41c063ffabd",
     "mimic-iv/concepts_duckdb/treatment/ventilation.sql": "4171114e000030a542ea860413c2576e5937e3da278608fe7fb81e21c1fe1ba9",
-    "mimic-iv/concepts_duckdb/score/sapsii.sql": "66a78d61a2887f9ac690618209d5e3022aa0271324646561af350de8597d7efa"
+    "mimic-iv/concepts_duckdb/score/sapsii.sql": "66a78d61a2887f9ac690618209d5e3022aa0271324646561af350de8597d7efa",
+    "mimic-iv/concepts_duckdb/score/sofa.sql": "5af9c75bdaeb9342138a0fbc8cbef33b132508689e3ac492ab574af1c7ff05b0"
   }
 }

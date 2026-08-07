@@ -11,7 +11,7 @@ def test_pinned_sources_and_recursive_graph(project_root) -> None:
     hashes = validate_official_sources(project_root)
     graph = audit_dependency_graph(project_root, load_itemid_manifest())
 
-    assert len(hashes) == 18
+    assert len(hashes) == 21
     assert graph["concept_dependency_order"][-1].endswith("score/sapsii.sql")
     assert set(graph["raw_tables"]) == {
         "mimiciv_hosp.admissions",

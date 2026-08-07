@@ -36,6 +36,8 @@ class ScoreSpecification(Protocol):
     score_table: str
     provenance_label: str
     item_manifest_version: str
+    output_granularity: str
+    primary_key_columns: tuple[str, ...]
 
     def vendor_root(self, project_root: Path) -> Path: ...
 

@@ -196,6 +196,66 @@ def _filter_sql(
                   AND raw.endtime > c.intime - INTERVAL '24' HOUR
             )
         """
+    elif specification.name == "sofa_hourly_14d" and qualified_table == "mimiciv_icu.chartevents":
+        all_ids = specification.item_ids(qualified_table)
+        full_context_ids = specification.full_context_item_ids(qualified_table)
+        predicate = f"""
+            raw.itemid IN ({_id_list(all_ids)})
+            AND EXISTS (
+                SELECT 1 FROM pipeline_meta.cohort_context c
+                WHERE c.stay_id = raw.stay_id
+                  AND (
+                    raw.itemid IN ({_id_list(full_context_ids)})
+                    OR (
+                      raw.itemid NOT IN ({_id_list(full_context_ids)})
+                      AND raw.charttime > c.intime - INTERVAL '24' HOUR
+                      AND raw.charttime <= LEAST(
+                        COALESCE(c.outtime, c.intime + INTERVAL '336' HOUR),
+                        c.intime + INTERVAL '336' HOUR
+                      )
+                    )
+                  )
+            )
+        """
+    elif specification.name == "sofa_hourly_14d" and qualified_table == "mimiciv_hosp.labevents":
+        predicate = f"""
+            raw.itemid IN ({_id_list(specification.item_ids(qualified_table))})
+            AND EXISTS (
+                SELECT 1 FROM pipeline_meta.cohort_context c
+                WHERE c.hadm_id = raw.hadm_id
+                  AND raw.charttime > c.intime - INTERVAL '24' HOUR
+                  AND raw.charttime <= LEAST(
+                    COALESCE(c.outtime, c.intime + INTERVAL '336' HOUR),
+                    c.intime + INTERVAL '336' HOUR
+                  )
+            )
+        """
+    elif specification.name == "sofa_hourly_14d" and qualified_table == "mimiciv_icu.inputevents":
+        predicate = f"""
+            raw.itemid IN ({_id_list(specification.item_ids(qualified_table))})
+            AND EXISTS (
+                SELECT 1 FROM pipeline_meta.cohort_context c
+                WHERE c.stay_id = raw.stay_id
+                  AND raw.starttime < LEAST(
+                    COALESCE(c.outtime, c.intime + INTERVAL '336' HOUR),
+                    c.intime + INTERVAL '336' HOUR
+                  )
+                  AND raw.endtime > c.intime - INTERVAL '24' HOUR
+            )
+        """
+    elif specification.name == "sofa_hourly_14d" and qualified_table == "mimiciv_icu.outputevents":
+        predicate = f"""
+            raw.itemid IN ({_id_list(specification.item_ids(qualified_table))})
+            AND EXISTS (
+                SELECT 1 FROM pipeline_meta.cohort_context c
+                WHERE c.stay_id = raw.stay_id
+                  AND raw.charttime > c.intime - INTERVAL '48' HOUR
+                  AND raw.charttime <= LEAST(
+                    COALESCE(c.outtime, c.intime + INTERVAL '336' HOUR),
+                    c.intime + INTERVAL '336' HOUR
+                  )
+            )
+        """
     elif specification.name == "sofa_first_day_adapted" and qualified_table == "mimiciv_icu.chartevents":
         all_ids = specification.item_ids(qualified_table)
         full_context_ids = specification.full_context_item_ids(qualified_table)

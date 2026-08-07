@@ -6,12 +6,14 @@ from mimic_clinical_scores.common.specification import ScoreSpecification
 from mimic_clinical_scores.scores.saps_ii.specification import SAPSII_SPEC
 from mimic_clinical_scores.scores.saps_iii_adapted.specification import SAPSIII_ADAPTED_SPEC
 from mimic_clinical_scores.scores.sofa_first_day_adapted.specification import SOFA_FIRST_DAY_ADAPTED_SPEC
+from mimic_clinical_scores.scores.sofa_hourly_14d.specification import SOFA_HOURLY_14D_SPEC
 
 
 SCORES: dict[str, ScoreSpecification] = {
     SAPSII_SPEC.name: SAPSII_SPEC,
     SAPSIII_ADAPTED_SPEC.name: SAPSIII_ADAPTED_SPEC,
     SOFA_FIRST_DAY_ADAPTED_SPEC.name: SOFA_FIRST_DAY_ADAPTED_SPEC,
+    SOFA_HOURLY_14D_SPEC.name: SOFA_HOURLY_14D_SPEC,
 }
 
 

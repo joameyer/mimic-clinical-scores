@@ -147,16 +147,24 @@ def calculate_coverage(
     )
     matched = int(connection.execute("SELECT COUNT(*) FROM mimiciv_icu.icustays").fetchone()[0])
     overall = one()
+    if getattr(specification, "output_granularity", "stay") == "stay_hour":
+        overall["score_rows"] = overall.pop("cohort_rows")
+        overall["cohort_stays"] = total_cohort
+    else:
+        overall["cohort_rows"] = total_cohort
+    stratified = {
+        "shorter_than_24h": one("short IS TRUE"),
+        "at_least_24h": one("short IS FALSE"),
+        "unknown_length": one("short IS NULL"),
+    }
+    if getattr(specification, "output_granularity", "stay") == "stay_hour":
+        for metrics in stratified.values():
+            metrics["score_rows"] = metrics.pop("cohort_rows")
     overall.update(
         {
-            "cohort_rows": total_cohort,
             "unique_stay_ids": unique_cohort,
             "matched_icu_stays": matched,
-            "stratified": {
-                "shorter_than_24h": one("short IS TRUE"),
-                "at_least_24h": one("short IS FALSE"),
-                "unknown_length": one("short IS NULL"),
-            },
+            "stratified": stratified,
         }
     )
     return overall
@@ -269,6 +277,7 @@ def export_all(
         "selected_id_hash": (cohort_manifest or {}).get("ordered_selected_id_sha256"),
         "mimic_version": mimic_version,
         "score_name": specification.name,
+        "output_granularity": getattr(specification, "output_granularity", "stay"),
         "score_provenance": specification.provenance_label,
         "upstream_source_manifest": preflight["official"].get("adaptation_source_manifest"),
         "upstream_source_manifest_sha256": preflight["official"].get("source_manifest_sha256"),
@@ -308,6 +317,7 @@ def validate_exports(
     *,
     output_directory: Path,
     identity_hash: str,
+    specification: ScoreSpecification | None = None,
 ) -> dict[str, Any]:
     required = (
         "scores.parquet", "score_missingness.parquet", "component_missingness.csv",
@@ -319,23 +329,55 @@ def validate_exports(
     manifest = json.loads((output_directory / "run_manifest.json").read_text(encoding="utf-8"))
     if manifest.get("run_identity_hash") != identity_hash:
         raise ExportError("run_manifest identity does not match the database")
+    if specification is None:
+        from mimic_clinical_scores.scores.registry import get_score
+
+        specification = get_score(str(manifest.get("score_name", "saps_ii")))
 
     scores_path = output_directory / "scores.parquet"
     missingness_path = output_directory / "score_missingness.parquet"
     cohort_rows = int(connection.execute("SELECT COUNT(*) FROM pipeline_meta.cohort").fetchone()[0])
-    if pq.read_metadata(scores_path).num_rows != cohort_rows:
-        raise ExportError("scores.parquet does not contain one row per cohort stay")
-    if pq.read_metadata(missingness_path).num_rows != cohort_rows:
-        raise ExportError("score_missingness.parquet row count differs from the cohort")
+    expected_rows = int(connection.execute(f"SELECT COUNT(*) FROM {specification.score_table}").fetchone()[0])
+    hourly = getattr(specification, "output_granularity", "stay") == "stay_hour"
+    if pq.read_metadata(scores_path).num_rows != expected_rows:
+        expected_description = "the hourly score table" if hourly else "one row per cohort stay"
+        raise ExportError(f"scores.parquet does not match {expected_description}")
+    if pq.read_metadata(missingness_path).num_rows != expected_rows:
+        raise ExportError("score_missingness.parquet row count differs from scores.parquet")
 
-    score_counts = connection.execute(
-        f"""
-        SELECT COUNT(*), COUNT(DISTINCT stay_id), COUNT(*) FILTER (WHERE stay_id IS NULL)
-        FROM read_parquet({_literal(str(scores_path.resolve()))})
-        """
-    ).fetchone()
-    if score_counts != (cohort_rows, cohort_rows, 0):
-        raise ExportError(f"Invalid score identifiers: {score_counts}")
+    if hourly:
+        score_counts = connection.execute(
+            f"""
+            SELECT COUNT(*), COUNT(DISTINCT stay_id),
+                   COUNT(*) FILTER (WHERE stay_id IS NULL OR hour_index IS NULL),
+                   COUNT(*) - COUNT(DISTINCT (stay_id, hour_index))
+            FROM read_parquet({_literal(str(scores_path.resolve()))})
+            """
+        ).fetchone()
+        if score_counts != (expected_rows, cohort_rows, 0, 0):
+            raise ExportError(f"Invalid hourly score identifiers: {score_counts}")
+        invalid_grid = connection.execute(
+            f"""
+            SELECT COUNT(*) FROM (
+              SELECT stay_id, MIN(hour_index) AS min_hr, MAX(hour_index) AS max_hr,
+                     COUNT(*) AS rows
+              FROM read_parquet({_literal(str(scores_path.resolve()))})
+              GROUP BY stay_id
+              HAVING min_hr <> 0 OR max_hr > 335 OR rows <> max_hr + 1
+            ) invalid
+            """
+        ).fetchone()[0]
+        if invalid_grid:
+            raise ExportError(f"Invalid or non-contiguous hourly grids for {invalid_grid} stays")
+    else:
+        score_counts = connection.execute(
+            f"""
+            SELECT COUNT(*), COUNT(DISTINCT stay_id), COUNT(*) FILTER (WHERE stay_id IS NULL)
+            FROM read_parquet({_literal(str(scores_path.resolve()))})
+            """
+        ).fetchone()
+        if score_counts != (cohort_rows, cohort_rows, 0):
+            raise ExportError(f"Invalid score identifiers: {score_counts}")
     mismatch = connection.execute(
         f"""
         SELECT COUNT(*) FROM (
@@ -349,4 +391,12 @@ def validate_exports(
     ).fetchone()[0]
     if mismatch:
         raise ExportError(f"Score stay IDs differ from the cohort ({mismatch} differences)")
-    return {"valid": True, "cohort_rows": cohort_rows, "checked_outputs": list(required)}
+    result = {"valid": True, "cohort_rows": cohort_rows, "checked_outputs": list(required)}
+    if hourly:
+        result["score_rows"] = expected_rows
+        result["maximum_hour_index"] = int(
+            connection.execute(
+                f"SELECT MAX(hour_index) FROM read_parquet({_literal(str(scores_path.resolve()))})"
+            ).fetchone()[0]
+        )
+    return result
