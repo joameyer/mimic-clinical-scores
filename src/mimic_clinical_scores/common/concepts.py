@@ -10,6 +10,7 @@ import duckdb
 from mimic_clinical_scores.common.duckdb import execute_table_artifact, table_exists
 from mimic_clinical_scores.common.provenance import sha256_file
 from mimic_clinical_scores.common.specification import Concept
+from mimic_clinical_scores.common.units import require_unit_validation
 
 
 class ConceptError(RuntimeError):
@@ -23,6 +24,7 @@ def build_concepts(
     vendor_root: Path,
     identity_hash: str,
 ) -> list[dict[str, object]]:
+    require_unit_validation(connection, identity_hash=identity_hash)
     results: list[dict[str, object]] = []
     for concept in concepts:
         path = vendor_root / concept.sql_relative_path
@@ -64,4 +66,3 @@ def execute_untracked(
 
     for concept in concepts:
         connection.execute((vendor_root / concept.sql_relative_path).read_text(encoding="utf-8"))
-

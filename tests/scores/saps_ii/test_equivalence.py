@@ -293,6 +293,21 @@ def test_validation_rejects_inconsistent_summary(computed_pipeline, tmp_path) ->
         )
 
 
+def test_validation_rejects_changed_unit_assurance(computed_pipeline, tmp_path) -> None:
+    output = _protected_output_copy(computed_pipeline["output"], tmp_path / "changed-units")
+    unit_path = output / "unit_validation.json"
+    audit = json.loads(unit_path.read_text(encoding="utf-8"))
+    audit["invalid_observation_rows"] = 1
+    unit_path.write_text(json.dumps(audit), encoding="utf-8")
+    unit_path.chmod(0o600)
+    with pytest.raises(ExportError, match="unit_validation.json differs"):
+        validate_exports(
+            computed_pipeline["optimized"],
+            output_directory=output,
+            identity_hash=computed_pipeline["identity"],
+        )
+
+
 def test_validation_rejects_changed_missingness_key(computed_pipeline, tmp_path) -> None:
     output = _protected_output_copy(computed_pipeline["output"], tmp_path / "changed-missingness")
     missingness_path = output / "score_missingness.parquet"

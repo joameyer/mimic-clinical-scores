@@ -128,12 +128,15 @@ labs AS (
    AND le.itemid IN (50820,50885,50912,51265,51301)
   GROUP BY c.stay_id
 ),
-blood_gas_rows AS (
-  SELECT c.stay_id, le.charttime, le.specimen_id, le.valuenum AS pao2,
-    coalesce(fio2.valuenum, chart_fio2.valuenum) AS fio2_recorded,
-    coalesce(vent.mechanically_ventilated,FALSE) AS mechanically_ventilated,
-    vent.support_charttime,
-    chart_fio2.charttime AS chart_fio2_time
+arterial_specimens AS (
+  SELECT DISTINCT hadm_id, specimen_id
+  FROM mimiciv_hosp.labevents
+  WHERE itemid=52033
+    AND upper(trim(coalesce(value,'')))='ART.'
+),
+arterial_gases AS (
+  SELECT c.stay_id, le.hadm_id, le.labevent_id, le.charttime, le.specimen_id,
+    le.valuenum AS pao2
   FROM cohort c
   JOIN mimiciv_hosp.labevents le
     ON le.hadm_id=c.hadm_id
@@ -141,44 +144,92 @@ blood_gas_rows AS (
    AND le.valuenum BETWEEN 0 AND 800
    AND le.charttime>=c.intime-INTERVAL '1' HOUR
    AND le.charttime<=c.intime+INTERVAL '1' HOUR
-  JOIN mimiciv_hosp.labevents specimen
+  JOIN arterial_specimens specimen
     ON specimen.hadm_id=le.hadm_id
    AND specimen.specimen_id=le.specimen_id
-   AND specimen.itemid=52033
-   AND upper(trim(coalesce(specimen.value,'')))='ART.'
-  LEFT JOIN LATERAL (
-    SELECT f.valuenum
-    FROM mimiciv_hosp.labevents f
-    WHERE f.hadm_id=le.hadm_id AND f.specimen_id=le.specimen_id
-      AND f.itemid=50816 AND f.valuenum>0
-    ORDER BY f.labevent_id DESC LIMIT 1
-  ) fio2 ON TRUE
-  LEFT JOIN LATERAL (
-    SELECT ce.valuenum, ce.charttime FROM mimiciv_icu.chartevents ce
-    WHERE ce.stay_id=c.stay_id AND ce.itemid=223835 AND ce.valuenum>0
-      AND ce.charttime<=le.charttime AND ce.charttime>=le.charttime-INTERVAL '2' HOUR
-    ORDER BY ce.charttime DESC LIMIT 1
-  ) chart_fio2 ON TRUE
-  LEFT JOIN LATERAL (
-    SELECT TRUE AS mechanically_ventilated, ce.charttime AS support_charttime
-    FROM mimiciv_icu.chartevents ce
-    WHERE ce.stay_id=c.stay_id
-      AND ce.itemid IN (223848,223849,224684,224688,224690,229314)
-      AND coalesce(trim(ce.value),'')<>''
-      AND ce.charttime<=le.charttime
-      AND ce.charttime>=le.charttime-INTERVAL '1' HOUR
-    ORDER BY ce.charttime DESC LIMIT 1
-  ) vent ON TRUE
+),
+lab_fio2_ranked AS (
+  SELECT f.hadm_id, f.specimen_id,
+    CASE WHEN f.valuenum<=1 THEN f.valuenum ELSE f.valuenum/100 END AS fio2_fraction,
+    ROW_NUMBER() OVER (
+      PARTITION BY f.hadm_id, f.specimen_id
+      ORDER BY f.labevent_id DESC NULLS LAST
+    ) AS selection_rank
+  FROM mimiciv_hosp.labevents f
+  WHERE f.itemid=50816
+    AND ((f.valuenum>0.2 AND f.valuenum<=1) OR (f.valuenum>20 AND f.valuenum<=100))
+),
+lab_fio2 AS (
+  SELECT hadm_id, specimen_id, fio2_fraction
+  FROM lab_fio2_ranked
+  WHERE selection_rank=1
+),
+charted_fio2_ranked AS (
+  SELECT ce.stay_id, ce.charttime,
+    CASE WHEN ce.valuenum<=1 THEN ce.valuenum ELSE ce.valuenum/100 END AS fio2_fraction,
+    ROW_NUMBER() OVER (
+      PARTITION BY ce.stay_id, ce.charttime
+      ORDER BY ce.storetime DESC NULLS LAST, ce.valuenum DESC
+    ) AS selection_rank
+  FROM mimiciv_icu.chartevents ce
+  WHERE ce.itemid=223835
+    AND ((ce.valuenum>0.2 AND ce.valuenum<=1) OR (ce.valuenum>20 AND ce.valuenum<=100))
+),
+charted_fio2 AS (
+  SELECT stay_id, charttime, fio2_fraction
+  FROM charted_fio2_ranked
+  WHERE selection_rank=1
+),
+gas_with_chart_fio2 AS (
+  SELECT gas.*, charted_fio2.charttime AS chart_fio2_candidate_time,
+    charted_fio2.fio2_fraction AS chart_fio2_candidate
+  FROM arterial_gases gas
+  ASOF LEFT JOIN charted_fio2
+    ON gas.stay_id=charted_fio2.stay_id
+   AND gas.charttime>=charted_fio2.charttime
+),
+vent_support AS (
+  SELECT DISTINCT ce.stay_id, ce.charttime
+  FROM mimiciv_icu.chartevents ce
+  WHERE ce.itemid IN (223848,223849,224684,224688,224690,229314)
+    AND coalesce(trim(ce.value),'')<>''
+),
+gas_with_context AS (
+  SELECT gas.*, vent_support.charttime AS support_candidate_time
+  FROM gas_with_chart_fio2 gas
+  ASOF LEFT JOIN vent_support
+    ON gas.stay_id=vent_support.stay_id
+   AND gas.charttime>=vent_support.charttime
+),
+blood_gas_rows AS (
+  SELECT gas.stay_id, gas.charttime, gas.specimen_id, gas.pao2,
+    coalesce(
+      fio2.fio2_fraction,
+      CASE WHEN gas.chart_fio2_candidate_time>=gas.charttime-INTERVAL '2' HOUR
+           THEN gas.chart_fio2_candidate END
+    ) AS fio2_fraction,
+    coalesce(
+      gas.support_candidate_time>=gas.charttime-INTERVAL '1' HOUR,
+      FALSE
+    ) AS mechanically_ventilated,
+    CASE WHEN gas.support_candidate_time>=gas.charttime-INTERVAL '1' HOUR
+         THEN gas.support_candidate_time END AS support_charttime,
+    CASE WHEN gas.chart_fio2_candidate_time>=gas.charttime-INTERVAL '2' HOUR
+         THEN gas.chart_fio2_candidate_time END AS chart_fio2_time
+  FROM gas_with_context gas
+  LEFT JOIN lab_fio2 fio2
+    ON fio2.hadm_id=gas.hadm_id
+   AND fio2.specimen_id=gas.specimen_id
 ),
 oxygenation AS (
   SELECT stay_id,
     MIN(pao2) AS pao2_min,
-    MIN(pao2 / NULLIF(CASE WHEN fio2_recorded<=1 THEN fio2_recorded ELSE fio2_recorded/100 END,0))
-      FILTER (WHERE mechanically_ventilated AND fio2_recorded>0) AS pf_min,
+    MIN(pao2 / NULLIF(fio2_fraction,0))
+      FILTER (WHERE mechanically_ventilated AND fio2_fraction IS NOT NULL) AS pf_min,
     MAX(CASE
       WHEN mechanically_ventilated THEN
-        CASE WHEN fio2_recorded IS NULL OR fio2_recorded<=0 THEN NULL
-             WHEN pao2 / NULLIF(CASE WHEN fio2_recorded<=1 THEN fio2_recorded ELSE fio2_recorded/100 END,0)<100 THEN 11
+        CASE WHEN fio2_fraction IS NULL THEN NULL
+             WHEN pao2 / NULLIF(fio2_fraction,0)<100 THEN 11
              ELSE 7 END
       WHEN pao2<60 THEN 5 ELSE 0 END) AS oxygenation_score,
     MAX(CAST(mechanically_ventilated AS INTEGER))=1 AS mechanical_ventilation_at_gas_proxy
@@ -189,7 +240,12 @@ vasoactive AS (
   SELECT c.stay_id,
     MAX(CASE WHEN ie.rate > 0
                   AND DATE_DIFF('second', GREATEST(ie.starttime,c.intime-INTERVAL '24' HOUR), LEAST(ie.endtime,c.intime)) >= 3600
-                  AND (ie.itemid <> 221662 OR (ie.rate >= 5 AND lower(coalesce(ie.rateuom,'')) LIKE '%mcg/kg/min%'))
+                  AND (ie.itemid <> 221662 OR (
+                    ie.rate >= 5
+                    AND lower(replace(replace(
+                      regexp_replace(trim(coalesce(ie.rateuom,'')), '[[:space:]]+', '', 'g'),
+                      'µ', 'u'), 'μ', 'u')) IN ('mcg/kg/min','ug/kg/min')
+                  ))
              THEN 1 ELSE 0 END) AS vasoactive_preicu
   FROM cohort c LEFT JOIN mimiciv_icu.inputevents ie
     ON ie.stay_id=c.stay_id AND ie.itemid IN (221289,221653,221662,221906)

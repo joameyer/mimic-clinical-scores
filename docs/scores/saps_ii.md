@@ -22,6 +22,11 @@ canonical table-definition hash and all execution hashes. The recursive order is
 Every SQL file is byte-for-byte upstream. Project wrappers provide schemas, filtered
 raw tables, state, and output aliases; there are no SQL adaptations.
 
+Before these files execute, the shared fail-closed
+[unit assurance](unit_assurance.md) verifies that every score-eligible raw numeric row
+uses the units assumed by the pinned thresholds. This wrapper validation does not edit
+or relabel the official SQL.
+
 ## Component/source audit
 
 The table lists the raw facts that can affect each SAPS II component. The unchanged

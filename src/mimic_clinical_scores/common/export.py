@@ -20,6 +20,7 @@ from mimic_clinical_scores.common.provenance import (
     utc_now,
 )
 from mimic_clinical_scores.common.staging import staging_statistics
+from mimic_clinical_scores.common.units import require_unit_validation, unit_validation_statistics
 from mimic_clinical_scores.scores.saps_ii.specification import SAPSII_SPEC
 from mimic_clinical_scores.common.specification import ScoreSpecification
 
@@ -257,6 +258,7 @@ def export_all(
     component_path = output_directory / "component_missingness.csv"
     coverage_path = output_directory / "coverage.json"
     staging_path = output_directory / "staging_statistics.json"
+    unit_validation_path = output_directory / "unit_validation.json"
     manifest_path = output_directory / "run_manifest.json"
 
     _atomic_copy_parquet(connection, specification.scores_projection_sql(), scores_path)
@@ -276,9 +278,12 @@ def export_all(
         component_missingness_rows(connection, specification),
     )
     coverage = calculate_coverage(connection, specification)
+    require_unit_validation(connection, identity_hash=identity_hash)
     stats = staging_statistics(connection)
+    unit_stats = unit_validation_statistics(connection)
     atomic_write_json(coverage_path, coverage)
     atomic_write_json(staging_path, stats)
+    atomic_write_json(unit_validation_path, unit_stats)
 
     started = connection.execute(
         "SELECT CAST(created_at AS VARCHAR) FROM pipeline_meta.run_identity WHERE singleton"
@@ -289,6 +294,7 @@ def export_all(
         "component_missingness": str(component_path.resolve()),
         "coverage": str(coverage_path.resolve()),
         "staging_statistics": str(staging_path.resolve()),
+        "unit_validation": str(unit_validation_path.resolve()),
         "run_manifest": str(manifest_path.resolve()),
     }
     manifest = {
@@ -333,6 +339,7 @@ def export_all(
         "slurm_metadata": _slurm_metadata(),
         "artifacts": read_artifact_rows(connection),
         "staging_statistics": stats,
+        "unit_validation": unit_stats,
         "coverage": coverage,
         "output_paths": outputs,
         "start_timestamp_utc": started,
@@ -497,7 +504,8 @@ def validate_exports(
 ) -> dict[str, Any]:
     required = (
         "scores.parquet", "score_missingness.parquet", "component_missingness.csv",
-        "coverage.json", "staging_statistics.json", "run_manifest.json",
+        "coverage.json", "staging_statistics.json", "unit_validation.json",
+        "run_manifest.json",
     )
     missing = [name for name in required if not (output_directory / name).is_file()]
     if missing:
@@ -515,6 +523,8 @@ def validate_exports(
         from mimic_clinical_scores.scores.registry import get_score
 
         specification = get_score(str(manifest.get("score_name", "saps_ii")))
+    require_unit_validation(connection, identity_hash=identity_hash)
+    expected_unit_validation = unit_validation_statistics(connection)
 
     scores_path = output_directory / "scores.parquet"
     missingness_path = output_directory / "score_missingness.parquet"
@@ -647,12 +657,20 @@ def validate_exports(
         raise ExportError("staging_statistics.json differs from the database audit state")
     if manifest.get("coverage") != coverage or manifest.get("staging_statistics") != staged:
         raise ExportError("run_manifest embedded summaries differ from standalone outputs")
+    exported_unit_validation = json.loads(
+        (output_directory / "unit_validation.json").read_text(encoding="utf-8")
+    )
+    if exported_unit_validation != expected_unit_validation:
+        raise ExportError("unit_validation.json differs from the database audit state")
+    if manifest.get("unit_validation") != expected_unit_validation:
+        raise ExportError("run_manifest unit assurance differs from the database audit state")
     expected_output_paths = {
         "scores": str(scores_path.resolve()),
         "score_missingness": str(missingness_path.resolve()),
         "component_missingness": str((output_directory / "component_missingness.csv").resolve()),
         "coverage": str((output_directory / "coverage.json").resolve()),
         "staging_statistics": str((output_directory / "staging_statistics.json").resolve()),
+        "unit_validation": str((output_directory / "unit_validation.json").resolve()),
         "run_manifest": str((output_directory / "run_manifest.json").resolve()),
     }
     if manifest.get("output_paths") != expected_output_paths:

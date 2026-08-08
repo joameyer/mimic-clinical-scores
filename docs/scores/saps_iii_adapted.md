@@ -18,6 +18,11 @@ supplement by URL and SHA-256, and cites the primary validation paper (DOI
 The downloaded documents are verified and gitignored. The project-owned SQL and
 item-ID manifest are hashed into every preflight report and run identity.
 
+The shared [unit assurance](unit_assurance.md) runs before this project-owned SQL. It
+requires explicit compatible units, documents the Fahrenheit conversion and
+fraction/percent FiO2 normalization, and rejects unconverted alternatives such as kPa
+PaO2 or µmol/L creatinine/bilirubin.
+
 ## Model and observation window
 
 SAPS III is an admission score, not a first-24-hour score. It starts with 16 points and
@@ -68,6 +73,12 @@ and contain only cohort-relevant rows. Exact endpoints are retained.
 | Bilirubin, creatinine, WBC, platelets, pH | `labevents` 50885, 50912, 51301, 51265, 50820 | Current stay's inclusive ±1 h | Highest bilirubin, creatinine, and WBC; lowest platelets and pH. The original supplement explicitly specifies highest WBC despite the later one-page sheet's conflicting “lowest” label. It explicitly permits either arterial or venous pH, so pH is not specimen-filtered |
 | PaO2 / FiO2 / ventilation | lab 50821, specimen 52033, FiO2 50816; chart 223835 and audited support IDs | Current stay arterial gas ±1 h; paired context at gas time | PaO2 requires same-specimen `ART.`. Same-specimen lab FiO2 is preferred, otherwise preceding chart FiO2 within 2 h. Support requires a nonempty setting at or within 1 h before that gas; future or unrelated window settings do not classify the gas |
 
+Gas-time chart context is matched with bounded set-based as-of joins. The two-hour
+FiO2 and one-hour support cutoffs are inclusive. When multiple valid charted FiO2
+rows share the same `charttime`, the row stored latest is selected; an otherwise
+unresolved tie selects the higher value. This deterministic rule replaces an
+unbounded per-gas correlated lookup without broadening either clinical time window.
+
 The exhaustive item declaration is
 `src/mimic_clinical_scores/scores/saps_iii_adapted/itemid_manifest.v2.json`.
 Preflight fails when score SQL references an item absent from that manifest or a raw
@@ -95,9 +106,11 @@ The independent Python reference checks every physiology threshold and the exact
 published equation transcriptions. Normalized synthetic tests independently verify
 highest-WBC selection, isolation of multiple ICU stays in one admission, arterial-only
 oxygenation, exclusion of a future ventilation setting, gas-time support, temperature
-site adjustment/unavailability, exact ±1-hour boundaries, proxy totals, and the null
-complete-case score. These tests establish implementation consistency, not clinical
-validity of proxy variables.
+site adjustment/unavailability, exact ±1-hour boundaries, exact inclusion of FiO2 at
+gas time minus two hours and support at gas time minus one hour, exclusion immediately
+outside those boundaries, proxy totals, and the null complete-case score. A regression
+test also rejects correlated `LATERAL` gas-context lookups. These tests establish
+implementation consistency, not clinical validity of proxy variables.
 
 ## Dev100 cluster run
 
@@ -146,11 +159,14 @@ echo "$JOB_ID"
 squeue -j "$JOB_ID"
 ```
 
-The allocation is 8 CPUs, 32 GB, and 30 minutes, with DuckDB limited to 24 GB and a
-dedicated spill directory. This leaves substantial margin over the dev100 integration
-and the earlier full SAPS II run while avoiding the previous 64 GB reservation. It
-writes `work/full/saps_iii_adapted.duckdb`, `outputs/full/saps_iii_adapted`, and
-`logs/full/saps_iii_adapted` without touching SAPS II artifacts.
+The initial corrected full-cohort verification allocation is 8 CPUs, 64 GB, and two
+hours, with DuckDB limited to 48 GB and a dedicated spill directory. A pre-optimization
+attempt using correlated per-blood-gas context lookups saturated 64 GB and produced
+more than 2 TB of spill without completing; it produced no approved v2 output. The
+current SQL uses set-based as-of matching and must be verified under a new run identity
+before the allocation is reduced. It writes `work/full/saps_iii_adapted.duckdb`,
+`outputs/full/saps_iii_adapted`, and `logs/full/saps_iii_adapted` without touching SAPS
+II artifacts.
 
 Progress is in the `.err` file after the job begins; final validation JSON is in
 `.out`. Re-submitting with the same paths resumes verified artifacts. A different

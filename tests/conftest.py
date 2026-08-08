@@ -14,13 +14,48 @@ from mimic_clinical_scores.common.staging import RAW_SCHEMAS
 
 RAW_FILES = tuple(RAW_SCHEMAS)
 
+CHART_UNITS = {
+    220045: "bpm",
+    220050: "mmHg", 220179: "mmHg", 225309: "mmHg",
+    220052: "mmHg", 220181: "mmHg", 225312: "mmHg",
+    223761: "°F", 223762: "°C", 223835: "%", 220277: "%",
+}
+LAB_UNITS = {
+    50816: "%", 50821: "mm Hg",
+    50885: "mg/dL", 50912: "mg/dL", 51006: "mg/dL",
+    51265: "K/uL", 51301: "K/uL",
+    50882: "mEq/L", 50971: "mEq/L", 50983: "mEq/L",
+}
+INPUT_RATE_UNITS = {
+    221289: "mcg/kg/min", 221653: "mcg/kg/min",
+    221662: "mcg/kg/min", 221906: "mcg/kg/min",
+}
+URINE_ITEM_IDS = {
+    226559, 226560, 226561, 226584, 226563, 226564,
+    226565, 226567, 226557, 226558, 227488, 227489,
+}
+
 
 def ts(base: datetime, **delta: float) -> str:
     return (base + timedelta(**delta)).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def row(relative: str, **values: object) -> dict[str, object]:
-    return {name: values.get(name) for name, _ in RAW_SCHEMAS[relative]}
+    result = {name: values.get(name) for name, _ in RAW_SCHEMAS[relative]}
+    itemid = values.get("itemid")
+    if relative == "icu/chartevents.csv.gz" and "valueuom" not in values:
+        result["valueuom"] = CHART_UNITS.get(itemid)
+    elif relative == "hosp/labevents.csv.gz" and "valueuom" not in values:
+        result["valueuom"] = LAB_UNITS.get(itemid)
+    elif relative == "icu/inputevents.csv.gz" and "rateuom" not in values:
+        result["rateuom"] = INPUT_RATE_UNITS.get(itemid)
+    elif (
+        relative == "icu/outputevents.csv.gz"
+        and "valueuom" not in values
+        and itemid in URINE_ITEM_IDS
+    ):
+        result["valueuom"] = "mL"
+    return result
 
 
 def write_raw(root: Path, rows: dict[str, list[dict[str, object]]]) -> None:
@@ -154,7 +189,6 @@ def synthetic_mimic(tmp_path_factory: pytest.TempPathFactory) -> dict[str, objec
                 itemid=itemid,
                 value=value,
                 valuenum=valuenum,
-                valueuom="",
                 warning=0,
             )
         )
@@ -231,7 +265,6 @@ def synthetic_mimic(tmp_path_factory: pytest.TempPathFactory) -> dict[str, objec
                 storetime=(charttime + timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S"),
                 value=value,
                 valuenum=valuenum,
-                valueuom="",
                 priority="ROUTINE",
             )
         )

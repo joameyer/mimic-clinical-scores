@@ -23,6 +23,7 @@ src/mimic_clinical_scores/
     preflight.py       metadata-only validation and run identity
     duckdb.py          configuration and transactional completion state
     staging.py         normalized one-pass filtered staging
+    units.py           fail-closed score-input unit assurance
     concepts.py        immutable SQL execution
     provenance.py      source, code, SQL, and item-ID audits
     export.py          atomic Parquet/CSV/JSON outputs
@@ -44,19 +45,22 @@ src/mimic_clinical_scores/
     staging_rules.py   first-day and episode-context retention rules
     sofa_first_day_adapted.sql
     scoring.py         score, evidence, and missingness projections
-    itemid_manifest.v1.json
+    itemid_manifest.v1.json  preserved historical provenance
+    itemid_manifest.v2.json
   scores/sofa_hourly_14d/
     specification.py   pinned hourly dependencies and longitudinal identity
     staging_rules.py   14-day, pre-ICU, and nested urine context
     sofa_hourly_14d.sql
     scoring.py         stay-hour score and missingness projections
-    itemid_manifest.v1.json
+    itemid_manifest.v1.json  preserved historical provenance
+    itemid_manifest.v2.json
   scores/sofa_hourly_reverse_7d/
     specification.py   discharge-relative dependencies and eligibility
     staging_rules.py   final-seven-day and nested lookback retention
     sofa_hourly_reverse_7d.sql
     scoring.py         reverse stay-hour and mortality projections
-    itemid_manifest.v1.json
+    itemid_manifest.v1.json  preserved historical provenance
+    itemid_manifest.v2.json
 ```
 
 The shared layer owns cohort validation, raw lookup, DuckDB settings, staging,
@@ -67,6 +71,13 @@ contract and its own staging declaration; it does not reimplement the shared pip
 Select it with `--score saps_ii` (the backward-compatible default),
 `--score saps_iii_adapted`, `--score sofa_first_day_adapted`,
 `--score sofa_hourly_14d`, or `--score sofa_hourly_reverse_7d`.
+
+After staging, every production path performs a fail-closed audit of score-driving
+`valueuom` and `rateuom` fields. Missing physical or dimensionally incompatible units
+stop the run before concepts execute; blank units are accepted only for declared
+dimensionless values or fixed FiO2 item IDs with an explicit fraction/percent numeric
+domain. Supported numeric equivalents and explicit conversions are documented in the
+[unit-assurance matrix](docs/scores/unit_assurance.md).
 
 ## Hourly SOFA through day 14
 
@@ -379,8 +390,11 @@ echo "$JOB_ID"
 squeue -j "$JOB_ID"
 ```
 
-It reuses the protected all-ICU allowlist when present, requests 8 CPUs, 32 GB and 30
-minutes, and writes only under the SAPS III adapted full paths. See the
+It reuses the protected all-ICU allowlist when present. The initial optimized v2
+verification requests 8 CPUs, 64 GB and two hours; reduce this only after a completed
+full-cohort resource record. The gas-context query uses set-based as-of joins rather
+than correlated per-gas searches. The job writes only under the SAPS III adapted full
+paths. See the
 [SAPS III adapted audit](docs/scores/saps_iii_adapted.md) for monitoring and resume
 details.
 
@@ -465,13 +479,16 @@ Development outputs are under `outputs/dev100/saps_ii`; full outputs are under
   and by duration stratum;
 - `staging_statistics.json`: raw fingerprints/sizes/scan rows, retained rows/fractions,
   filters, and elapsed times;
+- `unit_validation.json`: item-specific expected/accepted units, observed normalized
+  units and row counts, with zero rejected score-eligible observations required;
 - `run_manifest.json`: complete run identity, provenance, runtime, SLURM metadata,
-  artifacts, statistics, coverage, timestamps, and output paths.
+  artifacts, statistics, unit assurance, coverage, timestamps, and output paths.
 
 Validation recomputes the declared projections and requires exact schema and row
 equality for both Parquet files. It also reconciles CSV/JSON summaries with the score
-tables, verifies hourly timestamps and duration-derived row counts, and checks the
-manifest against the immutable database identity.
+tables, rechecks the unit-audit artifact, verifies hourly timestamps and
+duration-derived row counts, and checks the manifest against the immutable database
+identity.
 
 The official SQL computes the total using `COALESCE(component_score, 0)`. A non-null
 SAPS II total therefore does not mean the inputs were complete. Original null component

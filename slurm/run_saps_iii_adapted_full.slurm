@@ -2,8 +2,8 @@
 #SBATCH --job-name=saps3a-full
 #SBATCH --chdir=/hpcwork/jrc_combine/joana/mimic-clinical-scores
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=32G
-#SBATCH --time=00:30:00
+#SBATCH --mem=64G
+#SBATCH --time=02:00:00
 #SBATCH --output=logs/full/saps_iii_adapted/slurm-%j.out
 #SBATCH --error=logs/full/saps_iii_adapted/slurm-%j.err
 
@@ -23,7 +23,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-$PROJECT_ROOT/outputs/full/saps_iii_adapted}"
 LOG_DIR="${LOG_DIR:-$PROJECT_ROOT/logs/full/saps_iii_adapted}"
 SPILL_DIRECTORY="${SPILL_DIRECTORY:-$PROJECT_ROOT/work/full/saps_iii_adapted_spill}"
 DUCKDB_THREADS="${DUCKDB_THREADS:-${SLURM_CPUS_PER_TASK:-8}}"
-DUCKDB_MEMORY_LIMIT="${DUCKDB_MEMORY_LIMIT:-24GB}"
+DUCKDB_MEMORY_LIMIT="${DUCKDB_MEMORY_LIMIT:-48GB}"
 
 mkdir -p "$PROJECT_ROOT/inputs" "$LOG_DIR" "$PROJECT_ROOT/work/full" "$OUTPUT_DIR" "$SPILL_DIRECTORY"
 chmod 700 "$PROJECT_ROOT/inputs" "$LOG_DIR" "$PROJECT_ROOT/work/full" "$OUTPUT_DIR" "$SPILL_DIRECTORY"

@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pytest
 
 from conftest import RAW_FILES, row, ts, write_raw
 from mimic_clinical_scores.common.cohort import inspect_cohort
@@ -34,6 +35,15 @@ def test_adapted_item_manifest_is_complete_and_versioned(project_root) -> None:
         / SAPSIII_ADAPTED_SPEC.score_concept.sql_relative_path
     ).read_text(encoding="utf-8")
     assert extract_item_ids(sql) == {int(x["item_id"]) for x in manifest["entries"]}
+
+
+def test_blood_gas_context_uses_set_based_asof_joins(project_root) -> None:
+    sql = (
+        SAPSIII_ADAPTED_SPEC.vendor_root(project_root)
+        / SAPSIII_ADAPTED_SPEC.score_concept.sql_relative_path
+    ).read_text(encoding="utf-8")
+    assert "JOIN LATERAL" not in sql.upper()
+    assert sql.upper().count("ASOF LEFT JOIN") == 2
 
 
 def test_original_physiology_cutoffs_and_equations() -> None:
@@ -117,7 +127,11 @@ def test_filtered_admission_window_and_score(tmp_path, project_root) -> None:
         subject_id=1, hadm_id=10, specimen_id=1, itemid=52033,
         charttime=ts(base, hours=1), storetime=ts(base, hours=1), value="ART.", valuenum=None,
     ))
-    data["icu/inputevents.csv.gz"] = [row("icu/inputevents.csv.gz", subject_id=1, hadm_id=10, stay_id=100, starttime=ts(base, hours=-3), endtime=ts(base, hours=-1), itemid=221906, rate=0.1, rateuom="mcg/kg/min")]
+    data["icu/inputevents.csv.gz"] = [row(
+        "icu/inputevents.csv.gz", subject_id=1, hadm_id=10, stay_id=100,
+        starttime=ts(base, hours=-3), endtime=ts(base, hours=-1),
+        itemid=221662, rate=5, rateuom="µg/kg/min",
+    )]
     write_raw(root, data)
     cohort_file = tmp_path / "cohort.parquet"
     pq.write_table(pa.table({"stay_id": pa.array([100], type=pa.int64())}), cohort_file)
@@ -175,10 +189,29 @@ def test_worst_wbc_stay_local_labs_arterial_gases_and_timed_support(
     first = datetime(2100, 1, 2)
     second = datetime(2100, 1, 5)
     supported = datetime(2100, 1, 8)
+    fio2_boundaries = (
+        (103, supported + timedelta(days=1), 0.2, None),
+        (104, supported + timedelta(days=2), 0.200001, 80 / 0.200001),
+        (105, supported + timedelta(days=3), 1, 80.0),
+        (106, supported + timedelta(days=4), 20, None),
+        (107, supported + timedelta(days=5), 20.0001, 80 / 0.200001),
+        (108, supported + timedelta(days=6), 100, 80.0),
+        (109, supported + timedelta(days=7), 100.0001, None),
+    )
+    context_boundaries = (
+        (110, supported + timedelta(days=8), timedelta(hours=-2), timedelta(hours=-1), 160.0, True, 7),
+        (
+            111, supported + timedelta(days=9),
+            timedelta(hours=-2, seconds=-1), timedelta(hours=-1, seconds=-1),
+            None, False, 0,
+        ),
+    )
     stay_rows = (
         (1, 10, 100, first),
         (1, 10, 101, second),
         (2, 20, 102, supported),
+        *((2, 20, stay_id, intime) for stay_id, intime, _fio2, _pf in fio2_boundaries),
+        *((2, 20, stay_id, intime) for stay_id, intime, *_rest in context_boundaries),
     )
     for subject_id, hadm_id, stay_id, intime in stay_rows:
         data["icu/icustays.csv.gz"].append(row(
@@ -223,8 +256,16 @@ def test_worst_wbc_stay_local_labs_arterial_gases_and_timed_support(
     lab(1, 10, second, 11, 52033, "ART.")
     # Stay 102 has support documented before its arterial gas.
     lab(2, 20, supported, 12, 50821, 80)
-    lab(2, 20, supported, 12, 50816, 50)
+    # Invalid same-specimen FiO2 must not block a valid charted fallback.
+    lab(2, 20, supported, 12, 50816, 5)
     lab(2, 20, supported, 12, 52033, "ART.")
+    for stay_id, intime, fio2, _expected_pf in fio2_boundaries:
+        lab(2, 20, intime, stay_id, 50821, 80)
+        lab(2, 20, intime, stay_id, 50816, fio2)
+        lab(2, 20, intime, stay_id, 52033, "ART.")
+    for stay_id, intime, *_rest in context_boundaries:
+        lab(2, 20, intime, stay_id, 50821, 80)
+        lab(2, 20, intime, stay_id, 52033, "ART.")
 
     def chart(subject_id, hadm_id, stay_id, when, itemid, value, valuenum=None):
         data["icu/chartevents.csv.gz"].append(row(
@@ -240,6 +281,14 @@ def test_worst_wbc_stay_local_labs_arterial_gases_and_timed_support(
     chart(1, 10, 101, second, 224642, "Oral")       # adjusted to 35.1 C
     chart(1, 10, 101, second + timedelta(minutes=30), 223849, "CMV")
     chart(2, 20, 102, supported - timedelta(minutes=30), 223849, "CMV")
+    chart(2, 20, 102, supported - timedelta(minutes=20), 223835, 50, 50)
+    # The latest positive value is in neither the fraction nor percent domain.
+    chart(2, 20, 102, supported - timedelta(minutes=5), 223835, 5, 5)
+    for stay_id, intime, _fio2, _expected_pf in fio2_boundaries:
+        chart(2, 20, stay_id, intime - timedelta(minutes=30), 223849, "CMV")
+    for stay_id, intime, fio2_delta, support_delta, *_rest in context_boundaries:
+        chart(2, 20, stay_id, intime + fio2_delta, 223835, 50, 50)
+        chart(2, 20, stay_id, intime + support_delta, 223849, "CMV")
     data["icu/inputevents.csv.gz"].append(row(
         "icu/inputevents.csv.gz", subject_id=2, hadm_id=20, stay_id=102,
         starttime=ts(supported, hours=-3), endtime=ts(supported, hours=-1),
@@ -249,7 +298,7 @@ def test_worst_wbc_stay_local_labs_arterial_gases_and_timed_support(
     write_raw(root, data)
     cohort_file = tmp_path / "cohort.parquet"
     pq.write_table(
-        pa.table({"stay_id": pa.array([100, 101, 102], type=pa.int64())}),
+        pa.table({"stay_id": pa.array([row[2] for row in stay_rows], type=pa.int64())}),
         cohort_file,
     )
     preflight = run_preflight(
@@ -271,11 +320,32 @@ def test_worst_wbc_stay_local_labs_arterial_gases_and_timed_support(
     observed = con.execute(
         "SELECT stay_id,wbc_max,wbc_score,temp_max,temp_score,ph_min,ph_score,pao2_min,pf_min,"
         "mechanical_ventilation_at_gas_proxy,oxygenation_score,vasoactive_proxy_score "
-        "FROM mimiciv_derived.saps_iii_adapted ORDER BY stay_id"
+        "FROM mimiciv_derived.saps_iii_adapted WHERE stay_id <= 102 ORDER BY stay_id"
     ).fetchall()
     assert observed == [
         (100, 14.0, 0, None, None, 7.2, 3, None, None, False, None, 0),
         (101, 20.0, 2, 35.1, 0, None, None, 80.0, None, False, 0, 0),
         (102, None, None, None, None, None, None, 80.0, 160.0, True, 7, 0),
     ]
+    boundary_pf = dict(con.execute(
+        "SELECT stay_id,pf_min FROM mimiciv_derived.saps_iii_adapted "
+        "WHERE stay_id >= 103 ORDER BY stay_id"
+    ).fetchall())
+    for stay_id, _intime, _fio2, expected_pf in fio2_boundaries:
+        if expected_pf is None:
+            assert boundary_pf[stay_id] is None
+        else:
+            assert boundary_pf[stay_id] == pytest.approx(expected_pf)
+    context_observed = con.execute(
+        "SELECT stay_id,pf_min,mechanical_ventilation_at_gas_proxy,oxygenation_score "
+        "FROM mimiciv_derived.saps_iii_adapted WHERE stay_id>=110 ORDER BY stay_id"
+    ).fetchall()
+    for observed, expected in zip(context_observed, context_boundaries, strict=True):
+        stay_id, _intime, _fio2_delta, _support_delta, expected_pf, expected_vent, expected_score = expected
+        assert observed[0] == stay_id
+        if expected_pf is None:
+            assert observed[1] is None
+        else:
+            assert observed[1] == pytest.approx(expected_pf)
+        assert observed[2:] == (expected_vent, expected_score)
     con.close()

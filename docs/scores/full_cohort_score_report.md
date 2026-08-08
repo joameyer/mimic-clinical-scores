@@ -11,6 +11,12 @@
 > arterial gases, positive vasoactive doses, and recorded episodes lasting at least
 > one hour. The v1 values must not be treated as corrected results; regenerate them
 > before research use.
+>
+> All runs described here also predate the fail-closed quantitative unit audit. The
+> prior SAPS II calculation is not invalidated solely by that infrastructure change,
+> but it has no `unit_validation.json` evidence and therefore does not satisfy the
+> current unit-assurance gate. Regenerate every score before claiming current-pipeline
+> approval or unit assurance.
 
 ## Purpose and scope
 
@@ -35,7 +41,7 @@ MIMIC-derived data. The statistics below are aggregate and contain no identifier
 | Property | SAPS II | SAPS III adapted | Arterial first-day SOFA adapted |
 |---|---|---|---|
 | Output label | `sapsii_official`, `sapsii_prob_official` | v2: `saps_iii_complete_case_score` plus `saps_iii_proxy_total_unvalidated` and explicitly unvalidated proxy probabilities | `sofa_first_day_adapted`; six organ-component scores; no probability |
-| Status | Self-computed from raw MIMIC-IV using unchanged pinned official MIT-LCP SQL | Project-owned proxy sensitivity calculation; prior v1 full results withdrawn and v2 not yet run | Project-owned adaptation; prior v1 full results withdrawn and arterial/duration-corrected v2 not yet run |
+| Status | Historical pre-unit-audit run; unchanged pinned official MIT-LCP computation, but regeneration is required for current-pipeline assurance | Project-owned proxy sensitivity calculation; prior v1 full results withdrawn and v2 not yet run | Project-owned adaptation; prior v1 full results withdrawn and arterial/duration-corrected v2 not yet run |
 | Physiologic window | Generally `(ICU intime, ICU intime + 24 h]` | `[ICU intime - 1 h, ICU intime + 1 h]` | Generally `[ICU intime - 6 h, ICU intime + 24 h]`; urine begins at `intime` |
 | ICU discharge cap | No; the pinned SQL can use eligible hospital measurements after ICU discharge through hour 24 | No; the published admission window remains centered on ICU `intime` | No; eligible labs through hour 24 and fixed urine thresholds are retained for short stays |
 | Score rows | 94,458 | v1: 94,458, withdrawn; v2 not run | v1: 94,458, withdrawn; v2 not run |
@@ -670,8 +676,9 @@ For all three scores:
 4. Do not compare raw SAPS II, SAPS III, and SOFA totals as though they share a scale.
 5. Use `stay_id` as the join key and expect repeated patients or admissions when they
    contain multiple ICU stays.
-6. Preserve the run manifest with every analytical export so the exact cohort, code,
-   source, and SQL identity remain traceable.
+6. Preserve `unit_validation.json` and the run manifest with every analytical export
+   so the accepted raw units and exact cohort, code, source, and SQL identity remain
+   traceable.
 7. Treat patient-level score files, cohort allowlists, databases, logs, and copied
    outputs as protected MIMIC-derived data.
 

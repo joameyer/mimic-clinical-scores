@@ -142,7 +142,8 @@ def test_hourly_filtered_staging_matches_unfiltered_and_grid_is_bounded(
         "maximum_hour_index": 335,
         "checked_outputs": [
             "scores.parquet", "score_missingness.parquet", "component_missingness.csv",
-            "coverage.json", "staging_statistics.json", "run_manifest.json",
+            "coverage.json", "staging_statistics.json", "unit_validation.json",
+            "run_manifest.json",
         ],
     }
     reference.close()

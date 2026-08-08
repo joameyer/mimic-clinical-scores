@@ -26,6 +26,10 @@ All prerequisite measurement, ventilation, and medication concepts execute uncha
 from the pinned MIT-LCP source. `config/sofa_sources.json`, the SQL hashes, and the
 item-ID manifest are included in preflight and run identity.
 
+The shared [unit assurance](unit_assurance.md) verifies score-eligible raw measurement
+and infusion units before any of those concepts execute. Incompatible or missing
+units stop the run rather than being compared with SOFA thresholds.
+
 The component cutoffs are those of original SOFA, not the newer SOFA-2 consensus
 score. The MIMIC extraction and fixed first-day window remain research adaptations.
 

@@ -18,6 +18,7 @@ from mimic_clinical_scores.common.duckdb import (
 )
 from mimic_clinical_scores.common.provenance import canonical_json_hash
 from mimic_clinical_scores.common.specification import ScoreSpecification
+from mimic_clinical_scores.common.units import build_unit_validation
 from mimic_clinical_scores.scores.saps_ii.specification import SAPSII_SPEC
 from mimic_clinical_scores.scores.saps_ii.staging_rules import (
     CHARTEVENT_FULL_CONTEXT_ITEM_IDS,
@@ -645,6 +646,12 @@ def build_staging(
         elif not table_exists(connection, "pipeline_meta.cohort_context"):
             raise PipelineStateError("Cohort context is missing after ICU-stay staging")
 
+    unit_result = build_unit_validation(
+        connection,
+        specification=specification,
+        identity_hash=identity_hash,
+    )
+    results.append({"validation": "score_input_units", **unit_result})
     return results
 
 

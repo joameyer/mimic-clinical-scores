@@ -19,6 +19,10 @@ Five adaptations/corrections are explicit:
 
 This is an ICU-relative adaptation of the pinned MIT-LCP hourly SOFA implementation, not an independently validated clinical software product.
 
+The shared [unit assurance](unit_assurance.md) verifies all score-driving measurement,
+urine, and infusion units before the pinned concepts execute. The audit is part of the
+immutable run state and exported validation evidence.
+
 ## Hour and window semantics
 
 `hour_index=0` is `(intime, intime + 1 hour]`. The left boundary is open and the right boundary is closed, exactly matching the upstream hourly predicates. A final interval ends at exact raw `outtime`. A stay ending at 24 hours has rows 0–23; a stay lasting 24 hours and one minute has a partial row 24. The maximum is 336 rows, indexed 0–335, covering the first 14 elapsed ICU days.

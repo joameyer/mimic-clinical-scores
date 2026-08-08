@@ -21,6 +21,10 @@ evidence.
 
 Stays with null or non-positive `outtime-intime` are excluded because reverse alignment is undefined. Validation and `coverage.json` report their count explicitly.
 
+The shared [unit assurance](unit_assurance.md) verifies all score-driving measurement,
+urine, and infusion units before the pinned concepts execute. The audit is part of the
+immutable run state and exported validation evidence.
+
 ## Death and survival fields
 
 Scoring never filters on outcome. Raw `admissions.deathtime` and `hospital_expire_flag` are attached after constructing the grid. `scores.parquet` contains:
