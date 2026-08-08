@@ -31,8 +31,8 @@ def scores_projection_sql() -> str:
           (s.deathtime IS NOT NULL AND s.deathtime >= i.intime AND s.deathtime <= i.outtime)
             AS died_during_icu_stay,
           NOT (s.deathtime IS NOT NULL AND s.deathtime <= i.outtime)
-            AS alive_at_icu_discharge,
-          'sofa-hourly-reverse-7d-v1' AS adaptation_version
+            AS no_death_recorded_by_icu_discharge,
+          'sofa-hourly-reverse-7d-v2' AS adaptation_version
         FROM {TABLE} s
         JOIN mimiciv_icu.icustays i USING (stay_id)
         ORDER BY s.stay_id, s.hours_before_discharge

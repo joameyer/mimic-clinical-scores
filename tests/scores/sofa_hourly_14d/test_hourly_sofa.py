@@ -2,6 +2,11 @@ from __future__ import annotations
 
 import duckdb
 from datetime import datetime
+import json
+import pyarrow as pa
+import pyarrow.parquet as pq
+
+from conftest import RAW_FILES, row, ts, write_raw
 
 from mimic_clinical_scores.common.cohort import inspect_cohort
 from mimic_clinical_scores.common.concepts import build_concepts, execute_untracked
@@ -144,16 +149,34 @@ def test_hourly_filtered_staging_matches_unfiltered_and_grid_is_bounded(
     optimized.close()
 
 
-def test_hourly_manifest_audits_new_recursive_dependencies() -> None:
+def test_hourly_manifest_audits_new_recursive_dependencies(project_root) -> None:
     manifest = load_itemid_manifest()
-    assert manifest["manifest_version"] == "sofa-hourly-14d-v1"
+    assert manifest["manifest_version"] == "sofa-hourly-14d-v2"
+    historical = json.loads(
+        (project_root / "src/mimic_clinical_scores/scores/sofa_hourly_14d/"
+         "itemid_manifest.v1.json").read_text(encoding="utf-8")
+    )
+    assert historical["manifest_version"] == "sofa-hourly-14d-v1"
     by_concept = {entry["source_concept"] for entry in manifest["entries"]}
     assert "demographics/weight_durations.sql" in by_concept
     assert "measurement/urine_output_rate.sql" in by_concept
+    urine = next(
+        entry for entry in manifest["entries"]
+        if entry["source_concept"] == "measurement/urine_output.sql"
+    )
+    assert urine["required_time_context"].startswith("all earlier selected-stay")
+    assert all(
+        "at least one hour" in entry["reason_for_retention"]
+        for entry in manifest["entries"]
+        if entry["raw_table"] == "mimiciv_icu.inputevents"
+    )
 
 
-def test_intime_relative_boundaries_partial_discharge_and_preicu_rolling(project_root) -> None:
+def test_intime_relative_partial_discharge_has_exact_elapsed_window(project_root) -> None:
     con = duckdb.connect()
+    assert con.execute(
+        "SELECT GREATEST(NULL::INTEGER, 1), GREATEST(1, NULL::INTEGER)"
+    ).fetchone() == (1, 1)
     con.execute("CREATE SCHEMA mimiciv_icu; CREATE SCHEMA mimiciv_derived")
     con.execute(
         "CREATE TABLE mimiciv_icu.icustays(subject_id INTEGER,hadm_id INTEGER,"
@@ -161,7 +184,9 @@ def test_intime_relative_boundaries_partial_discharge_and_preicu_rolling(project
     )
     con.execute(
         "INSERT INTO mimiciv_icu.icustays VALUES "
-        "(1,10,100,TIMESTAMP '2100-01-01 00:00:00',TIMESTAMP '2100-01-01 02:15:00')"
+        "(1,10,100,TIMESTAMP '2100-01-01 00:00:00',TIMESTAMP '2100-01-01 02:15:00'),"
+        "(2,20,101,TIMESTAMP '2100-01-01 00:00:00',TIMESTAMP '2100-01-01 00:00:00'),"
+        "(3,30,102,TIMESTAMP '2100-01-01 00:00:00',TIMESTAMP '2100-01-01 02:00:00')"
     )
     definitions = {
         "bg": "subject_id INTEGER,charttime TIMESTAMP,pao2fio2ratio DOUBLE,specimen VARCHAR",
@@ -181,9 +206,20 @@ def test_intime_relative_boundaries_partial_discharge_and_preicu_rolling(project
         con.execute(f"CREATE TABLE mimiciv_derived.{table}({columns})")
     con.execute(
         "INSERT INTO mimiciv_derived.vitalsign VALUES "
-        "(100,TIMESTAMP '2100-01-01 00:00:00',60),"
+        "(100,TIMESTAMP '2099-12-31 02:30:00',60),"
+        "(100,TIMESTAMP '2100-01-01 00:00:00',80),"
         "(100,TIMESTAMP '2100-01-01 01:00:00',80),"
-        "(100,TIMESTAMP '2100-01-01 01:00:01',60)"
+        "(100,TIMESTAMP '2100-01-01 01:00:01',80),"
+        "(102,TIMESTAMP '2100-01-01 00:30:00',80)"
+    )
+    con.execute(
+        "INSERT INTO mimiciv_derived.epinephrine VALUES "
+        "(100,TIMESTAMP '2100-01-01',TIMESTAMP '2100-01-01 02:00:00',0)"
+    )
+    con.execute(
+        "INSERT INTO mimiciv_derived.norepinephrine VALUES "
+        "(100,TIMESTAMP '2100-01-01',TIMESTAMP '2100-01-01 00:59:00',0.05),"
+        "(102,TIMESTAMP '2100-01-01',TIMESTAMP '2100-01-01 01:00:00',0.05)"
     )
     execute_untracked(
         con,
@@ -193,7 +229,7 @@ def test_intime_relative_boundaries_partial_discharge_and_preicu_rolling(project
     rows = con.execute(
         "SELECT hr,starttime,endtime,meanbp_min,cardiovascular,"
         "cardiovascular_24hours_raw,sofa_24hours "
-        "FROM mimiciv_derived.sofa_hourly_14d ORDER BY hr"
+        "FROM mimiciv_derived.sofa_hourly_14d WHERE stay_id=100 ORDER BY hr"
     ).fetchall()
     assert rows == [
         (
@@ -202,11 +238,80 @@ def test_intime_relative_boundaries_partial_discharge_and_preicu_rolling(project
         ),
         (
             1, datetime(2100, 1, 1, 1), datetime(2100, 1, 1, 2),
-            60.0, 1, 1, 1,
+            80.0, 0, 1, 1,
         ),
         (
             2, datetime(2100, 1, 1, 2), datetime(2100, 1, 1, 2, 15),
             None, None, 1, 1,
         ),
     ]
+    assert con.execute(
+        "SELECT COUNT(*) FROM mimiciv_derived.sofa_hourly_14d WHERE stay_id=101"
+    ).fetchone()[0] == 0
+    assert con.execute(
+        "SELECT hr,cardiovascular FROM mimiciv_derived.sofa_hourly_14d "
+        "WHERE stay_id=102 ORDER BY hr"
+    ).fetchall() == [(0, 3), (1, None)]
+    projection = con.execute(
+        SOFA_HOURLY_14D_SPEC.scores_projection_sql().replace(
+            "ORDER BY s.stay_id, s.hr", ""
+        ) + " WHERE s.stay_id=100 AND s.hr=2"
+    ).fetchone()
+    projection_names = [column[0] for column in con.description]
+    assert dict(zip(projection_names, projection))["trailing_window_start"] == datetime(
+        2099, 12, 31, 2, 15
+    )
+    con.close()
+
+
+def test_urine_staging_retains_predecessor_outside_old_48h_bound(
+    tmp_path, project_root
+) -> None:
+    root = tmp_path / "raw"
+    data = {relative: [] for relative in RAW_FILES}
+    base = datetime(2100, 1, 3)
+    data["icu/icustays.csv.gz"].append(
+        row(
+            "icu/icustays.csv.gz", subject_id=1, hadm_id=10, stay_id=100,
+            first_careunit="MICU", last_careunit="MICU", intime=ts(base),
+            outtime=ts(base, hours=2), los=2 / 24,
+        )
+    )
+    data["icu/chartevents.csv.gz"].append(
+        row(
+            "icu/chartevents.csv.gz", subject_id=1, hadm_id=10, stay_id=100,
+            caregiver_id=1, charttime=ts(base, hours=-100),
+            storetime=ts(base, hours=-100), itemid=220045, value="80", valuenum=80.0,
+        )
+    )
+    for hour in (-49, -45, -22):
+        data["icu/outputevents.csv.gz"].append(
+            row(
+                "icu/outputevents.csv.gz", subject_id=1, hadm_id=10, stay_id=100,
+                caregiver_id=1, charttime=ts(base, hours=hour),
+                storetime=ts(base, hours=hour), itemid=226559, value=100.0,
+                valueuom="ml",
+            )
+        )
+    write_raw(root, data)
+    cohort_file = tmp_path / "cohort.parquet"
+    pq.write_table(pa.table({"stay_id": pa.array([100], type=pa.int64())}), cohort_file)
+    preflight = run_preflight(
+        project_root=project_root, mimic_root=root, cohort_file=cohort_file,
+        mode="full", specification=SOFA_HOURLY_14D_SPEC,
+    )
+    settings = DuckDBSettings(tmp_path / "urine.duckdb", threads=1, memory_limit="1GB")
+    con = connect(settings)
+    identity = ensure_run_identity(con, identity_payload(preflight, mimic_version="synthetic"))
+    build_staging(
+        con, mimic_root=root, cohort=inspect_cohort(cohort_file, mode="full"),
+        identity_hash=identity, raw_metadata=preflight["raw_sources"],
+        profile_directory=tmp_path / "profiles", specification=SOFA_HOURLY_14D_SPEC,
+    )
+    _build(con, project_root, identity)
+    assert con.execute("SELECT COUNT(*) FROM mimiciv_icu.outputevents").fetchone()[0] == 3
+    assert con.execute(
+        "SELECT uo_tm_24hr FROM mimiciv_derived.urine_output_rate "
+        "WHERE charttime=TIMESTAMP '2100-01-02 02:00:00'"
+    ).fetchone()[0] == 27.0
     con.close()

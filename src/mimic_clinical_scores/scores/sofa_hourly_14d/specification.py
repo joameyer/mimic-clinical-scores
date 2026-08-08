@@ -62,10 +62,18 @@ EXPECTED_HEADERS = {
 
 
 def load_itemid_manifest() -> dict[str, Any]:
-    path = files("mimic_clinical_scores.scores.sofa_hourly_14d").joinpath(
-        "itemid_manifest.v1.json"
+    package = files("mimic_clinical_scores.scores.sofa_hourly_14d")
+    overlay = json.loads(
+        package.joinpath("itemid_manifest.v2.json").read_text(encoding="utf-8")
     )
-    return json.loads(path.read_text(encoding="utf-8"))
+    base = json.loads(package.joinpath(overlay["base_manifest"]).read_text(encoding="utf-8"))
+    entries = [dict(entry) for entry in base["entries"]]
+    for override in overlay["entry_overrides"]:
+        matches = [entry for entry in entries if entry["source_concept"] == override["source_concept"]]
+        if len(matches) != 1:
+            raise ValueError(f"Manifest override must match once: {override['source_concept']}")
+        matches[0].update({key: value for key, value in override.items() if key != "source_concept"})
+    return {**base, "manifest_version": overlay["manifest_version"], "entries": entries}
 
 
 @dataclass(frozen=True)
@@ -82,10 +90,10 @@ class SOFAHourly14dSpecification:
     probability_columns: tuple[str, ...] = ()
     score_table: str = "mimiciv_derived.sofa_hourly_14d"
     provenance_label: str = (
-        "MIT-LCP mimic-code v3.0.1 hourly SOFA, adapted only to an ICU-intime-relative "
-        "hour grid capped at 336 output hours and ICU discharge"
+        "MIT-LCP mimic-code v3.0.1 hourly SOFA adapted to an ICU-intime-relative "
+        "grid with exact elapsed 24-hour windows and at-least-one-hour vasoactive episodes"
     )
-    item_manifest_version: str = "sofa-hourly-14d-v1"
+    item_manifest_version: str = "sofa-hourly-14d-v2"
     output_granularity: str = "stay_hour"
     primary_key_columns: tuple[str, ...] = ("stay_id", "hr")
 

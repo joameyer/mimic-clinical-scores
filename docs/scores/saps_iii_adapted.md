@@ -5,7 +5,7 @@
 This is **not an official SAPS III implementation**. MIT-LCP/mimic-code v3.0.1 has
 SAPS II and APS III concepts, but no SAPS III concept. The project therefore preserves
 the published 2005 SAPS III point cut-offs and probability equations while declaring
-each MIMIC-specific approximation as adaptation `saps-iii-adapted-v1`.
+each MIMIC-specific approximation as adaptation `saps-iii-adapted-v2`.
 
 `config/saps_iii_sources.json` pins the official score sheet and data-definition
 supplement by URL and SHA-256, and cites the primary validation paper (DOI
@@ -27,19 +27,23 @@ admission, and physiology. Physiology is selected from the inclusive interval
 at ICU discharge. ICU duration fields remain in the output for cohort audit and
 short-stay stratification, but do not alter SAPS III.
 
-The total treats an unavailable component as its published reference category (zero
-points), while the original null component remains null. Consequently, a total and
-probability do not establish complete observation. Always inspect
-`score_missingness.parquet` and the availability/proxy columns.
+Original variables that cannot be established from structured MIMIC-IV remain null.
+Because at least one required original variable is unavailable,
+`saps_iii_complete_case_score` is null. The project separately exports
+`saps_iii_proxy_total_unvalidated`, which zero-fills unavailable physiology and uses
+the explicitly named `*_proxy_score` context fields. That value is a sensitivity
+calculation, not a published-model score.
 
 The two exported mortality estimates are:
 
 - global: `logit = -32.6659 + 7.3068 × ln(score + 20.5958)`;
 - North America: `logit = -18.8839 + 4.3979 × ln(score + 1)`.
 
-They are named `saps_iii_prob_global_adapted` and
-`saps_iii_prob_north_america_adapted`. They are model estimates, not observed outcomes
-or calibrated guarantees for MIMIC-IV.
+They are applied only to the proxy total and named
+`saps_iii_prob_global_proxy_unvalidated` and
+`saps_iii_prob_north_america_proxy_unvalidated`. Their names are part of the safety
+contract: they are neither validated SAPS III estimates nor calibrated guarantees for
+MIMIC-IV.
 
 ## Staging/source audit
 
@@ -51,21 +55,21 @@ and contain only cohort-relevant rows. Exact endpoints are retained.
 | Age | `patients`, `icustays` | Cohort subjects/stays | Anchor-based MIMIC age at ICU year |
 | Hospital LOS before ICU | `admissions`, `icustays` | Cohort admissions | Exact admission-to-ICU elapsed time |
 | Location before ICU | `transfers` | Complete cohort-admission transfer history | Latest care unit strictly before ICU; name-mapped to OR, ED, intermediate/ICU, or other |
-| Comorbidity | `diagnoses_icd` | All diagnoses for cohort admissions | High-specificity ICD proxies for AIDS, metastatic cancer, hematologic malignancy, cirrhosis; current-discharge coding is post-hoc. NYHA IV and cancer therapy are unavailable and score zero |
-| Pre-ICU vasoactive therapy | `inputevents` IDs 221289, 221653, 221662, 221906 | Events overlapping the 24 h before ICU; at least 1 h overlap | ICU input records incompletely represent ward/ED therapy. Dopamine requires recorded rate ≥5 mcg/kg/min |
-| Planned ICU | `admissions`, `services`, `transfers` | Complete admission/service/transfer context | Proxy: elective admission plus surgical service or OR predecessor. The original ≥12 h planned-decision fact is unavailable |
-| Reason for ICU admission | `diagnoses_icd` | All cohort-admission diagnoses | High-specificity ICD proxy; when several groups occur, one priority/worst mapped category is selected. Diagnoses are post-hoc, not admission-time indications |
-| Surgery status/site | `procedures_icd`, `admissions`, diagnoses | Procedures dated no later than ICU calendar day | Day-resolution and admission-type proxies cannot reproduce the original 24 h planning rule. Transplant, trauma, isolated CABG, and cerebrovascular neurosurgery mappings are versioned in SQL |
-| Infection | diagnoses plus pre-ICU hospital LOS | All cohort-admission diagnoses | Respiratory infection is ICD-derived. Nosocomial status requires an infection/septic-shock proxy plus ≥2 pre-ICU hospital days; acquisition is not observed |
-| GCS | `chartevents` 220739, 223900, 223901 | Inclusive ±1 h | Lowest complete eye+verbal+motor set sharing one chart time. Pre-sedation GCS remains unavailable |
+| Comorbidity | `diagnoses_icd` | All diagnoses for cohort admissions | ICD-derived `comorbidity_proxy_score` only. The original component is null because post-hoc coding, NYHA IV, and recent cancer therapy are unavailable |
+| Pre-ICU vasoactive therapy | `inputevents` IDs 221289, 221653, 221662, 221906 | Positive-rate events overlapping the 24 h before ICU; at least 1 h overlap | The original component is null because ICU input records incompletely represent ward/ED therapy. Dopamine additionally requires recorded rate ≥5 mcg/kg/min; `vasoactive_proxy_score` is sensitivity-only |
+| Planned ICU | `admissions`, `services`, `transfers` | Complete admission/service/transfer context | Original component is null. A separately named proxy uses elective admission plus surgical service or OR predecessor; it cannot establish the original ≥12 h decision |
+| Reason for ICU admission | `diagnoses_icd` | All cohort-admission diagnoses | Original component is null. The sensitivity proxy is post-hoc and uses an explicit priority rule |
+| Surgery status/site | `procedures_icd`, `admissions`, diagnoses | Procedures dated no later than ICU calendar day | Original components are null. Day-resolution proxy fields cannot reproduce the planning rule or reliably establish site at ICU admission |
+| Infection | diagnoses plus pre-ICU hospital LOS | All cohort-admission diagnoses | Original component is null. Proxy site/acquisition is post-hoc and not observed at admission |
+| GCS | `chartevents` 220739, 223900, 223901 | Inclusive ±1 h | Original pre-sedation component is null. `gcs_proxy_score` uses the lowest complete contemporaneous charted set |
 | HR | `chartevents` 220045 | Inclusive ±1 h | Highest valid value |
 | Systolic BP | `chartevents` 220050, 220179, 225309 | Inclusive ±1 h | Lowest valid invasive/non-invasive value |
-| Temperature | `chartevents` 223761, 223762 | Inclusive ±1 h | Highest, Fahrenheit converted to Celsius |
-| Bilirubin, creatinine, WBC, platelets, pH, PaO2 | `labevents` 50885, 50912, 51301, 51265, 50820, 50821 | Inclusive ±1 h for every selected stay sharing the admission | Published direction: highest bilirubin/creatinine and lowest leukocytes/platelets/pH/PaO2; multiple ICU stays in one admission use their own windows |
-| FiO2 / ventilation | lab 50816; chart 223835 and audited ventilator-setting IDs | Gas ±1 h; chart FiO2 retains up to 2 h preceding a boundary gas | Same-time lab FiO2 preferred, otherwise most recent chart FiO2 in preceding 2 h. Any recorded ventilator setting in the admission window is the mechanical-ventilation proxy |
+| Temperature | `chartevents` 223761, 223762 and site 224642 | Inclusive ±1 h; site must share chart time | Central temperature is used directly; documented peripheral temperature receives +0.5°C. If any candidate temperature lacks a recognized site, the component is unavailable because the highest adjusted value cannot be established |
+| Bilirubin, creatinine, WBC, platelets, pH | `labevents` 50885, 50912, 51301, 51265, 50820 | Current stay's inclusive ±1 h | Highest bilirubin, creatinine, and WBC; lowest platelets and pH. The original supplement explicitly specifies highest WBC despite the later one-page sheet's conflicting “lowest” label. It explicitly permits either arterial or venous pH, so pH is not specimen-filtered |
+| PaO2 / FiO2 / ventilation | lab 50821, specimen 52033, FiO2 50816; chart 223835 and audited support IDs | Current stay arterial gas ±1 h; paired context at gas time | PaO2 requires same-specimen `ART.`. Same-specimen lab FiO2 is preferred, otherwise preceding chart FiO2 within 2 h. Support requires a nonempty setting at or within 1 h before that gas; future or unrelated window settings do not classify the gas |
 
 The exhaustive item declaration is
-`src/mimic_clinical_scores/scores/saps_iii_adapted/itemid_manifest.v1.json`.
+`src/mimic_clinical_scores/scores/saps_iii_adapted/itemid_manifest.v2.json`.
 Preflight fails when score SQL references an item absent from that manifest or a raw
 header/source is missing.
 
@@ -75,21 +79,25 @@ Structured MIMIC-IV does not reliably encode the date/time an ICU decision was m
 the clinician-stated ICU admission reason, surgery planning lead time, infection
 acquisition, NYHA class IV, recent cancer therapy, or a pre-sedation estimated GCS.
 Input events also do not guarantee complete pre-ICU vasoactive capture. These are not
-silently presented as exact variables: the score name, adaptation version, proxy
-fields, source documentation, and run manifest keep the distinction visible.
+silently presented as reference-category observations: original component fields are
+null, proxy fields contain the sensitivity mappings, and the total/probability names
+state `proxy` and `unvalidated`.
 
-Because these deviations can change both score and calibration, use this adapted score
-for transparent research comparisons and sensitivity analysis—not as a drop-in
-clinical SAPS III implementation. External validation/calibration is required before
-interpreting its probabilities in a target population.
+Because these deviations can change both score and calibration, the proxy output may
+be used only as a clearly labelled sensitivity variable. It must not be used as a
+drop-in SAPS III implementation, a validated mortality estimate, or evidence of
+equivalence to published SAPS III. External validation and calibration would be
+required before predictive interpretation.
 
 ## Correctness tests
 
-The independent Python reference checks every physiology threshold and both published
-equations. A normalized synthetic raw-data pathway tests exact ±1-hour boundaries,
-immediate exclusion, worst values, GCS, missing components, P/F with ventilation,
-vasoactive overlap, context proxy scores, total, and both probabilities. These tests
-establish implementation consistency, not equivalence of proxies to unavailable facts.
+The independent Python reference checks every physiology threshold and the exact two
+published equation transcriptions. Normalized synthetic tests independently verify
+highest-WBC selection, isolation of multiple ICU stays in one admission, arterial-only
+oxygenation, exclusion of a future ventilation setting, gas-time support, temperature
+site adjustment/unavailability, exact ±1-hour boundaries, proxy totals, and the null
+complete-case score. These tests establish implementation consistency, not clinical
+validity of proxy variables.
 
 ## Dev100 cluster run
 

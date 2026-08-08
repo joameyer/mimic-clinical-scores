@@ -1,12 +1,13 @@
-# Classic first-day SOFA adapted for MIMIC-IV
+# Arterial first-day SOFA adapted for MIMIC-IV
 
 ## Identity and provenance
 
-`sofa_first_day_adapted` is a one-row-per-ICU-stay classic SOFA score. It is based on
+`sofa_first_day_adapted` is a one-row-per-ICU-stay adaptation of first-day SOFA. It is based on
 MIT-LCP/mimic-code release `v3.0.1`, commit
 `c7e07560dc847e32cbb0b2890213e8e7cbd8bc7e`, and its DuckDB first-day SOFA source
 (SHA-256 `02736bd4faf9885fed67de777ec85852b50e93ac1ddc03bd6e5039216ce3d86e`).
-It is deliberately not named “official” because the project applies two documented
+It is deliberately not named “official” or unqualified “classic SOFA” because the
+project applies four documented
 adaptations:
 
 1. The legacy upstream first-day query omits scores 2 and 1 for invasively ventilated
@@ -16,12 +17,17 @@ adaptations:
 2. Instead of building MIT-LCP's broad `first_day_lab` table, it derives only the
    platelet, bilirubin, creatinine, MAP, GCS, and urine aggregates used by SOFA. It
    preserves the upstream joins and inclusive boundary predicates.
+3. Only blood gases whose pinned `bg.specimen` value is `ART.` can drive respiratory
+   SOFA.
+4. Vasoactive rates must be positive, and the recorded episode must last at least one
+   hour. An episode lasting exactly one hour qualifies.
 
 All prerequisite measurement, ventilation, and medication concepts execute unchanged
 from the pinned MIT-LCP source. `config/sofa_sources.json`, the SQL hashes, and the
 item-ID manifest are included in preflight and run identity.
 
-This is classic SOFA, not the newer SOFA-2 consensus score.
+The component cutoffs are those of original SOFA, not the newer SOFA-2 consensus
+score. The MIMIC extraction and fixed first-day window remain research adaptations.
 
 ## Components and output
 
@@ -43,23 +49,26 @@ null. Consequently, a non-null total does not imply complete measurements.
 Classic SOFA defines no direct mortality probability. The project therefore exports
 no probability column and marks probability coverage as not applicable.
 
-The score Parquet also retains the component-driving extrema and drug rates, the
-adaptation version, and `ventilated_pf_correction_applied=true` for audit.
+The score Parquet also retains the component-driving extrema and drug rates,
+`adaptation_version='sofa-first-day-adapted-v2'`, and
+`ventilated_pf_correction_applied=true` for audit.
 
 ## Source and staging audit
 
 | Component | Pinned concept | Raw source and key item IDs | Retained context | Caveat |
 |---|---|---|---|---|
-| Respiratory | `bg`, `oxygen_delivery`, `ventilator_setting`, `ventilation` | `labevents` blood-gas set including 50821/50816/52033; `chartevents` 223835, 220277 and ventilation/oxygen items | Labs `[intime-6h,intime+24h]`; full selected-stay ventilation/FiO2 context | Upstream first-day join is by subject and time and does not add an arterial-specimen restriction; only `InvasiveVent` counts as support |
+| Respiratory | `bg`, `oxygen_delivery`, `ventilator_setting`, `ventilation` | `labevents` blood-gas set including 50821/50816/52033; `chartevents` 223835, 220277 and ventilation/oxygen items | Labs `[intime-6h,intime+24h]`; full selected-stay ventilation/FiO2 context | Requires `specimen='ART.'`; only `InvasiveVent` counts as support |
 | Coagulation | `complete_blood_count` | `labevents` complete concept set; platelets 51265 | `[intime-6h,intime+24h]` | Platelets may be unmeasured |
 | Liver | `enzyme` | `labevents` complete concept set; bilirubin 50885 | `[intime-6h,intime+24h]` | Bilirubin is commonly less complete than routine labs |
-| Cardiovascular | `vitalsign`; four medication concepts | MAP chart IDs; input IDs 221653, 221662, 221289, 221906 | MAP `[intime-6h,intime+24h]`; drug `starttime` in the same interval | A drug beginning earlier but continuing into the interval is omitted by preserved upstream start-time semantics; pre-ICU ICU-input capture may be incomplete |
+| Cardiovascular | `vitalsign`; four medication concepts | MAP chart IDs; input IDs 221653, 221662, 221289, 221906 | MAP `[intime-6h,intime+24h]`; drug `starttime` in the same interval; recorded episode duration ≥1h | Epinephrine/norepinephrine must also have rate >0; an episode beginning before the window remains omitted; pre-ICU ICU-input capture may be incomplete |
 | CNS | `gcs` | 220739, 223900, 223901 | Full selected-stay components; score selects within `[intime-6h,intime+24h]` | Sedation/intubation and missing/asynchronous components can limit interpretability |
 | Renal | `chemistry`, `urine_output` | creatinine 50912; 12 official urine IDs | Creatinine `[intime-6h,intime+24h]`; urine `[intime,intime+24h]` | Urine is not duration-normalized for short stays |
 
 Every source gzip is streamed once during a new staging build. Staging keeps only the
 cohort, declared item IDs, and safe score context. The tables remain normalized.
-`itemid_manifest.v1.json` declares the complete official item sets and preflight fails
+`itemid_manifest.v2.json` overlays the preserved historical v1 manifest with the
+corrected context declarations; the resolved manifest declares the complete pinned
+item sets and preflight fails
 if the pinned item-bearing SQL and manifest disagree.
 
 ## Window and short-stay interpretation
@@ -85,9 +94,9 @@ the score. Expected gaps include absent ABG/FiO2 pairs, bilirubin, GCS, or urine
 The total's zero contribution for a missing component can systematically lower scores;
 no additional imputation is performed.
 
-Other preserved limitations are subject/time rather than admission matching for
-first-day laboratory concepts, incomplete pre-ICU vasopressor capture, infusion
-selection by start time instead of overlap, GCS confounding, and fixed first-day urine
+Other limitations are subject/time rather than admission matching for first-day
+laboratory concepts, incomplete pre-ICU vasopressor capture, infusion selection by
+start time instead of overlap, GCS confounding, and fixed first-day urine
 thresholds for stays observed less than 24 hours. This is a research derivation and
 requires outcome validation/calibration in its intended population.
 
@@ -110,9 +119,10 @@ Synthetic tests execute the same pinned prerequisite concepts twice: once agains
 unfiltered fixture tables and once against cohort/item/time-filtered staging. All IDs,
 components, totals, and retained extrema are compared with null-safe exact equality.
 Separate cases verify ventilated P/F ratios of 250 and 350 score 2 and 1, inclusive
-`intime-6h` and `intime+24h` boundaries, short stays, missing components, exports, and
-provenance. These tests establish implementation/staging equivalence, not clinical
-validation.
+`intime-6h` and `intime+24h` boundaries, exclusion of nonarterial gases, exclusion of
+zero-dose and sub-one-hour episodes, inclusion of an exactly one-hour positive episode,
+short stays, missing components, exports, and provenance. These tests establish
+implementation/staging equivalence and the stated boundaries, not clinical validation.
 
 ## Development deployment
 

@@ -1,0 +1,27 @@
+{
+  "manifest_version": "sofa-hourly-reverse-7d-v2",
+  "base_manifest": "itemid_manifest.v1.json",
+  "entry_overrides": [
+    {
+      "source_concept": "measurement/urine_output.sql",
+      "required_time_context": "all earlier selected-stay rows through outtime",
+      "reason_for_retention": "preserve the LAG predecessor plus nested hourly and 24-hour renal lookback"
+    },
+    {
+      "source_concept": "medication/dobutamine.sql",
+      "reason_for_retention": "cardiovascular SOFA from positive-rate episodes lasting at least one hour"
+    },
+    {
+      "source_concept": "medication/dopamine.sql",
+      "reason_for_retention": "cardiovascular SOFA from positive-rate episodes lasting at least one hour"
+    },
+    {
+      "source_concept": "medication/epinephrine.sql",
+      "reason_for_retention": "cardiovascular SOFA from positive-rate episodes lasting at least one hour"
+    },
+    {
+      "source_concept": "medication/norepinephrine.sql",
+      "reason_for_retention": "cardiovascular SOFA from positive-rate episodes lasting at least one hour"
+    }
+  ]
+}

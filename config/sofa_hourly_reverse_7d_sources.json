@@ -1,6 +1,6 @@
 {
   "score": "discharge-relative hourly SOFA over the final seven ICU days",
-  "adaptation_version": "sofa-hourly-reverse-7d-v1",
+  "adaptation_version": "sofa-hourly-reverse-7d-v2",
   "mimic_code": {
     "repository": "https://github.com/MIT-LCP/mimic-code.git",
     "release": "v3.0.1",
@@ -26,6 +26,14 @@
     {
       "id": "explicit-component-missingness",
       "description": "Nullable rolling components are retained while the upstream zero-filled total is preserved."
+    },
+    {
+      "id": "elapsed-window-and-vasoactive-correction",
+      "description": "Adds the omitted leading segment where an earliest partial interval enters a 24-row frame, and scores only positive vasoactive rates from episodes lasting at least one hour."
     }
+  ],
+  "preserved_context": [
+    "All earlier selected-stay urine-output rows are staged through outtime so the urine-rate LAG predecessor is preserved.",
+    "Every exported rolling interval is exactly (endtime-24h,endtime]."
   ]
 }

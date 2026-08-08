@@ -11,7 +11,10 @@ def test_pinned_sources_and_recursive_graph(project_root) -> None:
     hashes = validate_official_sources(project_root)
     graph = audit_dependency_graph(project_root, load_itemid_manifest())
 
-    assert len(hashes) == 21
+    assert len(hashes) == 22
+    assert hashes["mimic-iv/concepts_duckdb/firstday/first_day_sofa.sql"] == (
+        "02736bd4faf9885fed67de777ec85852b50e93ac1ddc03bd6e5039216ce3d86e"
+    )
     assert graph["concept_dependency_order"][-1].endswith("score/sapsii.sql")
     assert set(graph["raw_tables"]) == {
         "mimiciv_hosp.admissions",

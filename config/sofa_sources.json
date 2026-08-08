@@ -1,6 +1,6 @@
 {
-  "score": "classic SOFA first-day adapted",
-  "adaptation_version": "sofa-first-day-adapted-v1",
+  "score": "arterial first-day SOFA adapted",
+  "adaptation_version": "sofa-first-day-adapted-v2",
   "mimic_code": {
     "repository": "https://github.com/MIT-LCP/mimic-code.git",
     "release": "v3.0.1",
@@ -13,18 +13,22 @@
   "adaptations": [
     {
       "id": "respiratory-ventilated-pf-restoration",
-      "description": "Adds ventilated PaO2/FiO2 below 300 and below 400 branches and takes the worse supported/unsupported category, avoiding the upstream first-day fall-through to zero."
+      "description": "Requires arterial blood gases, adds ventilated PaO2/FiO2 below 300 and below 400 branches, and takes the worse supported/unsupported category."
     },
     {
       "id": "narrow-first-day-aggregates",
       "description": "Computes only the MAP, platelet, bilirubin, creatinine, urine and GCS aggregates used by SOFA with the same upstream boundary predicates."
+    },
+    {
+      "id": "vasoactive-duration",
+      "description": "Scores only positive vasoactive rates from recorded infusion episodes lasting at least one hour, as required by the original SOFA definition."
     }
   ],
   "known_preserved_behaviors": [
     "Laboratory and physiological window is inclusive from ICU intime minus 6 hours through intime plus 24 hours.",
     "Urine output is inclusive from ICU intime through intime plus 24 hours and is not normalized for short stays.",
-    "Vasopressors are selected by infusion starttime, not interval overlap.",
-    "Blood gases are joined by subject_id and charttime without an added arterial-specimen restriction.",
+    "Vasopressors are selected by infusion starttime within the first-day window and require total recorded duration of at least one hour.",
+    "Only blood gases marked ART. by the pinned blood-gas concept are eligible.",
     "Missing component scores are retained as null but contribute zero to the total."
   ]
 }

@@ -25,7 +25,8 @@ RULES = {
     ),
     "mimiciv_icu.outputevents": StagingRule(
         "mimiciv_icu.outputevents", "stay_id",
-        "audited urine-output item IDs from intime-48h through "
-        "min(outtime,intime+336h), preserving nested 24h urine lookback",
+        "all earlier audited urine-output rows for each selected stay through "
+        "min(outtime,intime+336h), preserving the predecessor required by LAG and "
+        "the nested 24h urine lookback",
     ),
 }

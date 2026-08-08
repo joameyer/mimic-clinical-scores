@@ -15,6 +15,7 @@ import pyarrow.parquet as pq
 from mimic_clinical_scores.common.duckdb import DuckDBSettings, read_artifact_rows
 from mimic_clinical_scores.common.provenance import (
     atomic_write_json,
+    canonical_json_hash,
     software_versions,
     utc_now,
 )
@@ -185,7 +186,13 @@ def component_missingness_rows(
         "all": "TRUE",
         "shorter_than_24h": "DATE_DIFF('microseconds', i.intime, i.outtime) / 3600000000.0 < 24.0",
         "at_least_24h": "DATE_DIFF('microseconds', i.intime, i.outtime) / 3600000000.0 >= 24.0",
+        "unknown_length": "i.outtime IS NULL",
     }
+    denominator_field = (
+        "row_count"
+        if getattr(specification, "output_granularity", "stay") == "stay_hour"
+        else "cohort_size"
+    )
     rows: list[dict[str, Any]] = []
     for component in specification.component_columns:
         for stratum, predicate in strata.items():
@@ -204,7 +211,7 @@ def component_missingness_rows(
                 {
                     "component": component,
                     "short_stay_stratum": stratum,
-                    "cohort_size": cohort_size,
+                    denominator_field: cohort_size,
                     "observed_count": observed,
                     "missing_count": missing,
                     "missing_percentage": 100.0 * missing / cohort_size if cohort_size else None,
@@ -235,6 +242,16 @@ def export_all(
     specification: ScoreSpecification = SAPSII_SPEC,
 ) -> dict[str, Any]:
     _prepare_output_directory(output_directory, identity_hash)
+    identity_row = connection.execute(
+        "SELECT identity_hash, payload_json FROM pipeline_meta.run_identity WHERE singleton"
+    ).fetchone()
+    if identity_row is None or identity_row[0] != identity_hash:
+        raise ExportError("Cannot export from a database with a different run identity")
+    database_identity = json.loads(identity_row[1])
+    if database_identity.get("score_name") != specification.name:
+        raise ExportError("Selected score differs from the immutable database identity")
+    if database_identity.get("mimic_version") != mimic_version:
+        raise ExportError("MIMIC version differs from the immutable database identity")
     scores_path = output_directory / "scores.parquet"
     missingness_path = output_directory / "score_missingness.parquet"
     component_path = output_directory / "component_missingness.csv"
@@ -247,7 +264,13 @@ def export_all(
     _atomic_write_csv(
         component_path,
         [
-            "component", "short_stay_stratum", "cohort_size", "observed_count",
+            "component", "short_stay_stratum",
+            (
+                "row_count"
+                if getattr(specification, "output_granularity", "stay") == "stay_hour"
+                else "cohort_size"
+            ),
+            "observed_count",
             "missing_count", "missing_percentage",
         ],
         component_missingness_rows(connection, specification),
@@ -319,6 +342,152 @@ def export_all(
     return manifest
 
 
+def _query_schema(
+    connection: duckdb.DuckDBPyConnection, query: str
+) -> tuple[tuple[str, str], ...]:
+    cursor = connection.execute(f"SELECT * FROM ({query}) AS projection LIMIT 0")
+    return tuple((str(column[0]), str(column[1])) for column in cursor.description)
+
+
+def _quoted_identifier(identifier: str) -> str:
+    return '"' + identifier.replace('"', '""') + '"'
+
+
+def _validate_parquet_projection(
+    connection: duckdb.DuckDBPyConnection,
+    *,
+    path: Path,
+    query: str,
+    label: str,
+    key_columns: tuple[str, ...],
+) -> None:
+    """Require an exported Parquet file to equal its declared projection exactly."""
+
+    expected_schema = _query_schema(connection, query)
+    actual_query = f"SELECT * FROM read_parquet({_literal(str(path.resolve()))})"
+    observed_schema = _query_schema(connection, actual_query)
+    if observed_schema != expected_schema:
+        raise ExportError(
+            f"{label} schema differs from the declared projection: "
+            f"observed={observed_schema}, expected={expected_schema}"
+        )
+    expected_columns = tuple(name for name, _ in expected_schema)
+    missing_keys = [column for column in key_columns if column not in expected_columns]
+    if missing_keys:
+        raise ExportError(f"{label} projection lacks primary-key columns: {missing_keys}")
+
+    join = " AND ".join(
+        f"expected.{_quoted_identifier(column)} = actual.{_quoted_identifier(column)}"
+        for column in key_columns
+    )
+    differs = " OR ".join(
+        f"expected.{_quoted_identifier(column)} IS DISTINCT FROM "
+        f"actual.{_quoted_identifier(column)}"
+        for column in expected_columns
+    )
+    first_key = _quoted_identifier(key_columns[0])
+    mismatch = int(
+        connection.execute(
+            f"""
+            WITH expected AS ({query}),
+                 actual AS (SELECT * FROM read_parquet({_literal(str(path.resolve()))}))
+            SELECT COUNT(*)
+            FROM expected FULL OUTER JOIN actual ON {join}
+            WHERE expected.{first_key} IS NULL
+               OR actual.{first_key} IS NULL
+               OR {differs}
+            """
+        ).fetchone()[0]
+    )
+    if mismatch:
+        raise ExportError(f"{label} differs from its declared projection in {mismatch} rows")
+
+
+def _validate_hourly_timestamps(
+    connection: duckdb.DuckDBPyConnection,
+    *,
+    scores_path: Path,
+    specification: ScoreSpecification,
+) -> None:
+    path = _literal(str(scores_path.resolve()))
+    if specification.name == "sofa_hourly_14d":
+        invalid = int(
+            connection.execute(
+                f"""
+                SELECT COUNT(*) FROM read_parquet({path})
+                WHERE hour_start IS DISTINCT FROM intime + hour_index * INTERVAL '1' HOUR
+                   OR hour_end IS DISTINCT FROM CASE
+                        WHEN outtime IS NULL
+                          THEN intime + (hour_index + 1) * INTERVAL '1' HOUR
+                        ELSE LEAST(
+                          intime + (hour_index + 1) * INTERVAL '1' HOUR, outtime
+                        )
+                      END
+                   OR hour_end <= hour_start
+                   OR trailing_window_end IS DISTINCT FROM hour_end
+                   OR trailing_window_start IS DISTINCT FROM hour_end - INTERVAL '24' HOUR
+                """
+            ).fetchone()[0]
+        )
+        expected_rows = int(
+            connection.execute(
+                """
+                SELECT SUM(
+                  CASE WHEN outtime IS NULL THEN 336
+                       WHEN outtime > intime THEN LEAST(
+                         336,
+                         TRY_CAST(CEIL(
+                           DATE_DIFF('microseconds', intime, outtime) / 3600000000.0
+                         ) AS INTEGER)
+                       )
+                       ELSE 0 END
+                )
+                FROM mimiciv_icu.icustays
+                """
+            ).fetchone()[0]
+        )
+    elif specification.name == "sofa_hourly_reverse_7d":
+        invalid = int(
+            connection.execute(
+                f"""
+                SELECT COUNT(*) FROM read_parquet({path})
+                WHERE hour_end IS DISTINCT FROM
+                        outtime - hours_before_discharge * INTERVAL '1' HOUR
+                   OR hour_start IS DISTINCT FROM GREATEST(
+                        intime, outtime - (hours_before_discharge + 1) * INTERVAL '1' HOUR
+                      )
+                   OR hour_end <= hour_start
+                   OR trailing_window_end IS DISTINCT FROM hour_end
+                   OR trailing_window_start IS DISTINCT FROM hour_end - INTERVAL '24' HOUR
+                """
+            ).fetchone()[0]
+        )
+        expected_rows = int(
+            connection.execute(
+                """
+                SELECT COALESCE(SUM(LEAST(
+                  168,
+                  TRY_CAST(CEIL(
+                    DATE_DIFF('microseconds', intime, outtime) / 3600000000.0
+                  ) AS INTEGER)
+                )), 0)
+                FROM mimiciv_icu.icustays
+                WHERE outtime IS NOT NULL AND outtime > intime
+                """
+            ).fetchone()[0]
+        )
+    else:
+        return
+    if invalid:
+        raise ExportError(f"Invalid hourly timestamps or trailing windows in {invalid} rows")
+    observed_rows = int(pq.read_metadata(scores_path).num_rows)
+    if observed_rows != expected_rows:
+        raise ExportError(
+            f"Hourly row count differs from duration-derived expectation: "
+            f"observed={observed_rows}, expected={expected_rows}"
+        )
+
+
 def validate_exports(
     connection: duckdb.DuckDBPyConnection,
     *,
@@ -336,6 +505,12 @@ def validate_exports(
     manifest = json.loads((output_directory / "run_manifest.json").read_text(encoding="utf-8"))
     if manifest.get("run_identity_hash") != identity_hash:
         raise ExportError("run_manifest identity does not match the database")
+    identity_row = connection.execute(
+        "SELECT identity_hash, payload_json FROM pipeline_meta.run_identity WHERE singleton"
+    ).fetchone()
+    if identity_row is None or identity_row[0] != identity_hash:
+        raise ExportError("Database run identity does not match the requested validation identity")
+    identity_payload = json.loads(identity_row[1])
     if specification is None:
         from mimic_clinical_scores.scores.registry import get_score
 
@@ -352,16 +527,40 @@ def validate_exports(
     if pq.read_metadata(missingness_path).num_rows != expected_rows:
         raise ExportError("score_missingness.parquet row count differs from scores.parquet")
 
+    exported_hour_column = None
     if hourly:
-        hour_column = getattr(specification, "hour_index_column", "hour_index")
+        exported_score_columns = tuple(pq.read_schema(scores_path).names)
+        exported_hour_column = (
+            "hour_index"
+            if "hour_index" in exported_score_columns
+            else "hours_before_discharge"
+        )
+    parquet_key = ("stay_id",) + ((exported_hour_column,) if exported_hour_column else ())
+    _validate_parquet_projection(
+        connection,
+        path=scores_path,
+        query=specification.scores_projection_sql(),
+        label="scores.parquet",
+        key_columns=parquet_key,
+    )
+    _validate_parquet_projection(
+        connection,
+        path=missingness_path,
+        query=specification.missingness_projection_sql(),
+        label="score_missingness.parquet",
+        key_columns=parquet_key,
+    )
+
+    if hourly:
+        hour_column = str(exported_hour_column)
         maximum_hour = int(getattr(specification, "maximum_hour_index", 335))
         eligible_stays = int(
             connection.execute(
-                "SELECT COUNT(*) FROM mimiciv_icu.icustays "
+                "SELECT COUNT(*) FROM mimiciv_icu.icustays WHERE "
                 + (
-                    "WHERE outtime IS NOT NULL AND outtime > intime"
+                    "outtime IS NOT NULL AND outtime > intime"
                     if getattr(specification, "requires_outtime", False)
-                    else ""
+                    else "outtime IS NULL OR outtime > intime"
                 )
             ).fetchone()[0]
         )
@@ -388,6 +587,9 @@ def validate_exports(
         ).fetchone()[0]
         if invalid_grid:
             raise ExportError(f"Invalid or non-contiguous hourly grids for {invalid_grid} stays")
+        _validate_hourly_timestamps(
+            connection, scores_path=scores_path, specification=specification
+        )
     else:
         score_counts = connection.execute(
             f"""
@@ -400,7 +602,12 @@ def validate_exports(
     expected_stay_query = (
         "SELECT stay_id FROM mimiciv_icu.icustays WHERE outtime IS NOT NULL AND outtime > intime"
         if hourly and getattr(specification, "requires_outtime", False)
-        else "SELECT stay_id FROM pipeline_meta.cohort"
+        else (
+            "SELECT stay_id FROM mimiciv_icu.icustays "
+            "WHERE outtime IS NULL OR outtime > intime"
+            if hourly
+            else "SELECT stay_id FROM pipeline_meta.cohort"
+        )
     )
     mismatch = connection.execute(
         f"""
@@ -415,15 +622,83 @@ def validate_exports(
     ).fetchone()[0]
     if mismatch:
         raise ExportError(f"Score stay IDs differ from the cohort ({mismatch} differences)")
+
+    expected_component_rows = component_missingness_rows(connection, specification)
+    with (output_directory / "component_missingness.csv").open(
+        "r", encoding="utf-8", newline=""
+    ) as stream:
+        observed_component_rows = list(csv.DictReader(stream))
+    serialized_expected = [
+        {key: "" if value is None else str(value) for key, value in row.items()}
+        for row in expected_component_rows
+    ]
+    if observed_component_rows != serialized_expected:
+        raise ExportError("component_missingness.csv differs from current score-table counts")
+
+    coverage = json.loads((output_directory / "coverage.json").read_text(encoding="utf-8"))
+    expected_coverage = calculate_coverage(connection, specification)
+    if coverage != expected_coverage:
+        raise ExportError("coverage.json differs from current score-table coverage")
+    staged = json.loads(
+        (output_directory / "staging_statistics.json").read_text(encoding="utf-8")
+    )
+    expected_staged = staging_statistics(connection)
+    if staged != expected_staged:
+        raise ExportError("staging_statistics.json differs from the database audit state")
+    if manifest.get("coverage") != coverage or manifest.get("staging_statistics") != staged:
+        raise ExportError("run_manifest embedded summaries differ from standalone outputs")
+    expected_output_paths = {
+        "scores": str(scores_path.resolve()),
+        "score_missingness": str(missingness_path.resolve()),
+        "component_missingness": str((output_directory / "component_missingness.csv").resolve()),
+        "coverage": str((output_directory / "coverage.json").resolve()),
+        "staging_statistics": str((output_directory / "staging_statistics.json").resolve()),
+        "run_manifest": str((output_directory / "run_manifest.json").resolve()),
+    }
+    if manifest.get("output_paths") != expected_output_paths:
+        raise ExportError("run_manifest output paths differ from the validated artifacts")
+    if manifest.get("score_name") != specification.name:
+        raise ExportError("run_manifest score name differs from the selected specification")
+    if manifest.get("output_granularity") != getattr(
+        specification, "output_granularity", "stay"
+    ):
+        raise ExportError("run_manifest output granularity differs from the specification")
+    identity_checks = {
+        "score_name": manifest.get("score_name"),
+        "mimic_version": manifest.get("mimic_version"),
+        "mimic_code_release": manifest.get("official_mimic_code_release"),
+        "mimic_code_commit": manifest.get("official_mimic_code_commit"),
+        "source_manifest_sha256": manifest.get("upstream_source_manifest_sha256"),
+        "dependency_order": manifest.get("concept_dependency_order"),
+        "sql_hashes": manifest.get("sql_hashes"),
+        "vendor_hashes": manifest.get("vendor_hashes"),
+        "item_manifest_version": manifest.get("item_id_manifest_version"),
+        "item_manifest_sha256": manifest.get("item_id_manifest_sha256"),
+        "raw_source_fingerprints": {
+            name: metadata.get("source_fingerprint")
+            for name, metadata in manifest.get("raw_source_metadata", {}).items()
+        },
+        "code_hash": canonical_json_hash(manifest.get("source_code_hashes", {})),
+    }
+    for key, observed in identity_checks.items():
+        if identity_payload.get(key) != observed:
+            raise ExportError(f"run_manifest {key} differs from the immutable database identity")
+    insecure = [
+        name for name in required
+        if (output_directory / name).stat().st_mode & 0o077
+    ]
+    if insecure:
+        raise ExportError("Output files are not protected with owner-only permissions: " + ", ".join(insecure))
     result = {"valid": True, "cohort_rows": cohort_rows, "checked_outputs": list(required)}
     if hourly:
         result["score_rows"] = expected_rows
         if getattr(specification, "requires_outtime", False):
             result["scored_stays"] = eligible_stays
             result["excluded_stays"] = cohort_rows - eligible_stays
-        result["maximum_hour_index"] = int(
-            connection.execute(
-                f"SELECT MAX({hour_column}) FROM read_parquet({_literal(str(scores_path.resolve()))})"
-            ).fetchone()[0]
+        maximum_observed = connection.execute(
+            f"SELECT MAX({hour_column}) FROM read_parquet({_literal(str(scores_path.resolve()))})"
+        ).fetchone()[0]
+        result["maximum_hour_index"] = (
+            int(maximum_observed) if maximum_observed is not None else None
         )
     return result

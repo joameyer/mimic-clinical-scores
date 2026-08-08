@@ -22,6 +22,7 @@
   "sha256": {
     "LICENSE": "fa5b4187cc5da20dc4f27d76d59c8507d1389a76559b5f56ab48a222d1eb3bb5",
     "mimic-iv/concepts/score/sapsii.sql": "4e4edd9569e3db4432d99ebe3c7e01a7507d7a73be74186ae038c9b58b7410fe",
+    "mimic-iv/concepts_duckdb/firstday/first_day_sofa.sql": "02736bd4faf9885fed67de777ec85852b50e93ac1ddc03bd6e5039216ce3d86e",
     "mimic-iv/concepts_duckdb/demographics/age.sql": "6316e9ce5f6a9b81f76fff1b891eb014287603e59e24e5704a59195819d06bfc",
     "mimic-iv/concepts_duckdb/demographics/weight_durations.sql": "c7116bdc932bc39e8b70aed98a7ada1f6a4a0cdd79ea4730aa3824340100c6c7",
     "mimic-iv/concepts_duckdb/measurement/bg.sql": "2a065d3311eee691c5bf3291dc397fc202c6ddc93aed92db1b52793e11130cef",

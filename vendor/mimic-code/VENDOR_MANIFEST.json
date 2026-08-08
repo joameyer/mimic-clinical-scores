@@ -6,5 +6,5 @@
   "adaptations": [
     "Project-owned SOFA score SQL is outside vendor/mimic-code and documented in config/sofa_sources.json, config/sofa_hourly_14d_sources.json, and config/sofa_hourly_reverse_7d_sources.json."
   ],
-  "note": "Files listed by config/official_sources.json are byte-for-byte upstream files. Vendored DuckDB dependencies are executed unchanged; the vendored upstream hourly SOFA is retained as the audited source for the explicitly adapted project SQL."
+  "note": "Files listed by config/official_sources.json are byte-for-byte upstream files. Vendored DuckDB dependencies are executed unchanged; the vendored upstream first-day and hourly SOFA files are retained as audited sources for the explicitly adapted project SQL."
 }

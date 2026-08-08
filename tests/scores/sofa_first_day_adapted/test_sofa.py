@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import json
 
 import duckdb
 import pyarrow as pa
@@ -93,7 +94,17 @@ def _optimized(root, cohort_file, project_root, temporary):
 
 def test_manifest_and_pinned_sql_dependencies_are_exact(project_root) -> None:
     manifest = load_itemid_manifest()
-    assert manifest["manifest_version"] == "sofa-first-day-adapted-v1"
+    assert manifest["manifest_version"] == "sofa-first-day-adapted-v2"
+    historical = json.loads(
+        (project_root / "src/mimic_clinical_scores/scores/sofa_first_day_adapted/"
+         "itemid_manifest.v1.json").read_text(encoding="utf-8")
+    )
+    assert historical["manifest_version"] == "sofa-first-day-adapted-v1"
+    assert all(
+        "at least one hour" in entry["reason_for_retention"]
+        for entry in manifest["entries"]
+        if entry["raw_table"] == "mimiciv_icu.inputevents"
+    )
     assert {entry["raw_table"] for entry in manifest["entries"]} == {
         "mimiciv_hosp.labevents",
         "mimiciv_icu.chartevents",
@@ -101,7 +112,7 @@ def test_manifest_and_pinned_sql_dependencies_are_exact(project_root) -> None:
         "mimiciv_icu.outputevents",
     }
     hashes = SOFA_FIRST_DAY_ADAPTED_SPEC.sql_hashes(project_root)
-    assert len(hashes) == len(SOFA_FIRST_DAY_ADAPTED_SPEC.concepts) + 1
+    assert len(hashes) == len(SOFA_FIRST_DAY_ADAPTED_SPEC.concepts) + 2
     assert hashes["mimic-iv/concepts_duckdb/medication/norepinephrine.sql"] == (
         "4085001f87dcdeeccde5877eb0dd3cc9718c7a8aab2bb57c2a6ab41c063ffabd"
     )
@@ -145,7 +156,7 @@ def test_filtered_staging_is_null_safe_exact_unfiltered_reference(
     )
     assert validate_exports(optimized, output_directory=output, identity_hash=identity)["valid"]
     assert preflight["official"]["adaptation_source_manifest"]["adaptation_version"] == (
-        "sofa-first-day-adapted-v1"
+        "sofa-first-day-adapted-v2"
     )
     reference.close()
     optimized.close()
@@ -247,3 +258,65 @@ def test_corrected_ventilated_pf_branches_and_inclusive_boundaries(tmp_path, pro
         "SELECT COUNT(*) FROM mimiciv_icu.chartevents WHERE itemid=220052"
     ).fetchone()[0] == 4
     optimized.close()
+
+
+def test_arterial_only_gases_and_one_hour_positive_vasoactive_rule(project_root) -> None:
+    con = duckdb.connect()
+    con.execute("CREATE SCHEMA mimiciv_icu; CREATE SCHEMA mimiciv_derived")
+    con.execute(
+        "CREATE TABLE mimiciv_icu.icustays(subject_id INTEGER,hadm_id INTEGER,stay_id INTEGER,"
+        "intime TIMESTAMP,outtime TIMESTAMP)"
+    )
+    con.execute(
+        "INSERT INTO mimiciv_icu.icustays VALUES "
+        "(1,10,100,TIMESTAMP '2100-01-01',TIMESTAMP '2100-01-02'),"
+        "(2,20,200,TIMESTAMP '2100-01-01',TIMESTAMP '2100-01-02')"
+    )
+    definitions = {
+        "bg": "subject_id INTEGER,charttime TIMESTAMP,pao2fio2ratio DOUBLE,specimen VARCHAR",
+        "ventilation": "stay_id INTEGER,starttime TIMESTAMP,endtime TIMESTAMP,ventilation_status VARCHAR",
+        "vitalsign": "stay_id INTEGER,charttime TIMESTAMP,mbp DOUBLE",
+        "gcs": "stay_id INTEGER,charttime TIMESTAMP,gcs DOUBLE",
+        "enzyme": "subject_id INTEGER,charttime TIMESTAMP,bilirubin_total DOUBLE",
+        "chemistry": "subject_id INTEGER,charttime TIMESTAMP,creatinine DOUBLE",
+        "complete_blood_count": "subject_id INTEGER,charttime TIMESTAMP,platelet DOUBLE",
+        "urine_output": "stay_id INTEGER,charttime TIMESTAMP,urineoutput DOUBLE",
+        "epinephrine": "stay_id INTEGER,starttime TIMESTAMP,endtime TIMESTAMP,vaso_rate DOUBLE",
+        "norepinephrine": "stay_id INTEGER,starttime TIMESTAMP,endtime TIMESTAMP,vaso_rate DOUBLE",
+        "dopamine": "stay_id INTEGER,starttime TIMESTAMP,endtime TIMESTAMP,vaso_rate DOUBLE",
+        "dobutamine": "stay_id INTEGER,starttime TIMESTAMP,endtime TIMESTAMP,vaso_rate DOUBLE",
+    }
+    for table, columns in definitions.items():
+        con.execute(f"CREATE TABLE mimiciv_derived.{table}({columns})")
+    con.execute(
+        "INSERT INTO mimiciv_derived.bg VALUES "
+        "(1,TIMESTAMP '2100-01-01 01:00:00',50,'VEN.'),"
+        "(2,TIMESTAMP '2100-01-01 01:00:00',350,'ART.')"
+    )
+    con.execute(
+        "INSERT INTO mimiciv_derived.vitalsign VALUES "
+        "(100,TIMESTAMP '2100-01-01 01:00:00',80),"
+        "(200,TIMESTAMP '2100-01-01 01:00:00',80)"
+    )
+    con.execute(
+        "INSERT INTO mimiciv_derived.epinephrine VALUES "
+        "(100,TIMESTAMP '2100-01-01',TIMESTAMP '2100-01-01 02:00:00',0)"
+    )
+    con.execute(
+        "INSERT INTO mimiciv_derived.norepinephrine VALUES "
+        "(100,TIMESTAMP '2100-01-01',TIMESTAMP '2100-01-01 00:59:00',0.05),"
+        "(200,TIMESTAMP '2100-01-01',TIMESTAMP '2100-01-01 01:00:00',0.05)"
+    )
+    execute_untracked(
+        con,
+        concepts=(SOFA_FIRST_DAY_ADAPTED_SPEC.score_concept,),
+        vendor_root=SOFA_FIRST_DAY_ADAPTED_SPEC.score_vendor_root(project_root),
+    )
+    assert con.execute(
+        "SELECT stay_id,respiration_score,cardiovascular_score,adaptation_version "
+        "FROM mimiciv_derived.sofa_first_day_adapted ORDER BY stay_id"
+    ).fetchall() == [
+        (100, None, 0, "sofa-first-day-adapted-v2"),
+        (200, 1, 3, "sofa-first-day-adapted-v2"),
+    ]
+    con.close()

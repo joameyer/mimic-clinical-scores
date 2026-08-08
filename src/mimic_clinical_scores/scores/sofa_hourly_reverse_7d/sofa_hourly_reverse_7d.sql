@@ -1,8 +1,9 @@
 -- Adaptation of MIT-LCP mimic-code v3.0.1 concepts_duckdb/score/sofa.sql.
 -- Upstream SHA-256: 5af9c75bdaeb9342138a0fbc8cbef33b132508689e3ac492ab574af1c7ff05b0
 -- Adaptations: discharge-relative intervals covering at most the final seven ICU
--- days; 24 internal pre-window context rows; exclusion of unusable outtime; and
--- nullable rolling components. Thresholds and event predicates are unchanged.
+-- days; 24 internal pre-window context rows; exclusion of unusable outtime; nullable
+-- rolling components; a boundary correction where the earliest partial interval
+-- enters a 24-row frame; and positive, at-least-one-hour vasoactive episodes.
 DROP TABLE IF EXISTS mimiciv_derived.sofa_hourly_reverse_7d;
 CREATE TABLE mimiciv_derived.sofa_hourly_reverse_7d AS
 WITH eligible AS (
@@ -47,10 +48,35 @@ WITH eligible AS (
     FALSE AS is_output
   FROM eligible e
   CROSS JOIN UNNEST(GENERATE_SERIES(1, 24)) AS hours(context_hour)
-), co AS (
-  SELECT * FROM output_grid
+), boundary_grid AS (
+  -- When the earliest output interval is partial, the 24th chronological
+  -- output row would otherwise span only 23 plus that fraction of an hour.
+  -- This row represents exactly the omitted leading segment.
+  SELECT
+    e.subject_id,
+    e.hadm_id,
+    e.stay_id,
+    -1000000 AS hours_before_discharge,
+    e.outtime - (e.last_output_hour - 23) * INTERVAL '1' HOUR
+      - INTERVAL '24' HOUR AS starttime,
+    e.intime AS endtime,
+    FALSE AS is_output,
+    TRUE AS is_boundary,
+    e.last_output_hour - 23 AS boundary_target_hour
+  FROM eligible e
+  WHERE e.last_output_hour >= 23
+    AND e.outtime - (e.last_output_hour - 23) * INTERVAL '1' HOUR
+          - INTERVAL '24' HOUR < e.intime
+), regular_co AS (
+  SELECT *, FALSE AS is_boundary, NULL::INTEGER AS boundary_target_hour
+  FROM output_grid
   UNION ALL
-  SELECT * FROM context_grid
+  SELECT *, FALSE AS is_boundary, NULL::INTEGER AS boundary_target_hour
+  FROM context_grid
+), co AS (
+  SELECT * FROM regular_co
+  UNION ALL
+  SELECT * FROM boundary_grid
 ), pafi AS (
   SELECT
     ie.stay_id,
@@ -138,27 +164,31 @@ WITH eligible AS (
   SELECT
     co.stay_id,
     co.hours_before_discharge,
-    MAX(epi.vaso_rate) AS rate_epinephrine,
-    MAX(nor.vaso_rate) AS rate_norepinephrine,
-    MAX(dop.vaso_rate) AS rate_dopamine,
-    MAX(dob.vaso_rate) AS rate_dobutamine
+    MAX(CASE WHEN epi.vaso_rate > 0 THEN epi.vaso_rate END) AS rate_epinephrine,
+    MAX(CASE WHEN nor.vaso_rate > 0 THEN nor.vaso_rate END) AS rate_norepinephrine,
+    MAX(CASE WHEN dop.vaso_rate > 0 THEN dop.vaso_rate END) AS rate_dopamine,
+    MAX(CASE WHEN dob.vaso_rate > 0 THEN dob.vaso_rate END) AS rate_dobutamine
   FROM co
   LEFT JOIN mimiciv_derived.epinephrine AS epi
     ON co.stay_id = epi.stay_id
-    AND co.endtime > epi.starttime
-    AND co.endtime <= epi.endtime
+    AND epi.starttime < co.endtime
+    AND epi.endtime > co.starttime
+    AND epi.endtime >= epi.starttime + INTERVAL '1' HOUR
   LEFT JOIN mimiciv_derived.norepinephrine AS nor
     ON co.stay_id = nor.stay_id
-    AND co.endtime > nor.starttime
-    AND co.endtime <= nor.endtime
+    AND nor.starttime < co.endtime
+    AND nor.endtime > co.starttime
+    AND nor.endtime >= nor.starttime + INTERVAL '1' HOUR
   LEFT JOIN mimiciv_derived.dopamine AS dop
     ON co.stay_id = dop.stay_id
-    AND co.endtime > dop.starttime
-    AND co.endtime <= dop.endtime
+    AND dop.starttime < co.endtime
+    AND dop.endtime > co.starttime
+    AND dop.endtime >= dop.starttime + INTERVAL '1' HOUR
   LEFT JOIN mimiciv_derived.dobutamine AS dob
     ON co.stay_id = dob.stay_id
-    AND co.endtime > dob.starttime
-    AND co.endtime <= dob.endtime
+    AND dob.starttime < co.endtime
+    AND dob.endtime > co.starttime
+    AND dob.endtime >= dob.starttime + INTERVAL '1' HOUR
   WHERE
     NOT epi.stay_id IS NULL OR NOT nor.stay_id IS NULL
     OR NOT dop.stay_id IS NULL OR NOT dob.stay_id IS NULL
@@ -170,6 +200,8 @@ WITH eligible AS (
     co.stay_id,
     co.hours_before_discharge,
     co.is_output,
+    co.is_boundary,
+    co.boundary_target_hour,
     co.starttime,
     co.endtime,
     adm.deathtime,
@@ -227,7 +259,9 @@ WITH eligible AS (
     END AS liver,
     CASE
       WHEN rate_dopamine > 15 OR rate_epinephrine > 0.1 OR rate_norepinephrine > 0.1 THEN 4
-      WHEN rate_dopamine > 5 OR rate_epinephrine <= 0.1 OR rate_norepinephrine <= 0.1 THEN 3
+      WHEN rate_dopamine > 5
+        OR (rate_epinephrine > 0 AND rate_epinephrine <= 0.1)
+        OR (rate_norepinephrine > 0 AND rate_norepinephrine <= 0.1) THEN 3
       WHEN rate_dopamine > 0 OR rate_dobutamine > 0 THEN 2
       WHEN meanbp_min < 70 THEN 1
       WHEN COALESCE(meanbp_min, rate_dopamine, rate_dobutamine, rate_epinephrine, rate_norepinephrine) IS NULL THEN NULL
@@ -252,7 +286,7 @@ WITH eligible AS (
       ELSE 0
     END AS renal
   FROM scorecomp
-), rolling AS (
+), rolling_base AS (
   SELECT
     s.*,
     MAX(respiration) OVER w AS respiration_24hours_raw,
@@ -262,10 +296,28 @@ WITH eligible AS (
     MAX(cns) OVER w AS cns_24hours_raw,
     MAX(renal) OVER w AS renal_24hours_raw
   FROM scorecalc AS s
+  WHERE NOT is_boundary
   WINDOW w AS (
     PARTITION BY stay_id ORDER BY endtime NULLS FIRST
     ROWS BETWEEN 23 PRECEDING AND CURRENT ROW
   )
+), rolling AS (
+  SELECT
+    rb.* EXCLUDE (
+      respiration_24hours_raw, coagulation_24hours_raw, liver_24hours_raw,
+      cardiovascular_24hours_raw, cns_24hours_raw, renal_24hours_raw
+    ),
+    GREATEST(rb.respiration_24hours_raw, b.respiration) AS respiration_24hours_raw,
+    GREATEST(rb.coagulation_24hours_raw, b.coagulation) AS coagulation_24hours_raw,
+    GREATEST(rb.liver_24hours_raw, b.liver) AS liver_24hours_raw,
+    GREATEST(rb.cardiovascular_24hours_raw, b.cardiovascular) AS cardiovascular_24hours_raw,
+    GREATEST(rb.cns_24hours_raw, b.cns) AS cns_24hours_raw,
+    GREATEST(rb.renal_24hours_raw, b.renal) AS renal_24hours_raw
+  FROM rolling_base AS rb
+  LEFT JOIN scorecalc AS b
+    ON b.is_boundary
+    AND rb.stay_id = b.stay_id
+    AND rb.hours_before_discharge = b.boundary_target_hour
 ), score_final AS (
   SELECT
     rolling.*,

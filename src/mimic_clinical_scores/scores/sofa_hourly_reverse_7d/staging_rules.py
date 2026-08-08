@@ -27,6 +27,7 @@ RULES = {
     ),
     "mimiciv_icu.outputevents": StagingRule(
         "mimiciv_icu.outputevents", "stay_id",
-        "audited urine IDs from 48h before max(intime,outtime-168h) through outtime",
+        "all earlier audited urine rows for each eligible selected stay through outtime, "
+        "preserving the predecessor required by LAG and nested urine lookback",
     ),
 }

@@ -17,7 +17,8 @@ RULES = {
     ),
     "mimiciv_icu.inputevents": StagingRule(
         "mimiciv_icu.inputevents", "stay_id",
-        "four audited vasoactive item IDs with starttime inclusive [intime-6h,intime+24h]",
+        "four audited vasoactive item IDs with starttime inclusive "
+        "[intime-6h,intime+24h]; scoring requires a recorded episode duration >=1h",
     ),
     "mimiciv_icu.outputevents": StagingRule(
         "mimiciv_icu.outputevents", "stay_id",

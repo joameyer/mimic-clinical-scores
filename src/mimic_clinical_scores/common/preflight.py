@@ -83,7 +83,7 @@ def run_preflight(
         sql_path = specification.vendor_root(project_root) / specification.score_concept.sql_relative_path
         observed_ids = extract_item_ids(sql_path.read_text(encoding="utf-8"))
         declared_ids = {int(entry["item_id"]) for entry in item_manifest["entries"]}
-        if not observed_ids <= declared_ids:
+        if observed_ids != declared_ids:
             raise ProvenanceError(
                 f"Adapted SAPS III item-ID audit failed: SQL={sorted(observed_ids)} "
                 f"manifest={sorted(declared_ids)}"
@@ -185,6 +185,14 @@ def run_preflight(
             raise ProvenanceError(
                 f"Unexpected pinned upstream SOFA hash: {observed_upstream_hash}"
             )
+        upstream_relative = str(source_manifest[expected_upstream_key]["path"])
+        vendored_upstream_hash = vendor_hashes.get(upstream_relative)
+        if vendored_upstream_hash != expected_upstream_hash:
+            raise ProvenanceError(
+                "Pinned upstream SOFA source is not vendored at its declared hash: "
+                f"{upstream_relative}={vendored_upstream_hash!r}, "
+                f"expected={expected_upstream_hash}"
+            )
     else:
         raise ProvenanceError(f"No preflight implementation for score {specification.name}")
     expected_files = set(specification.required_raw_tables)
@@ -280,7 +288,9 @@ def identity_payload(
         "mimic_code_release": preflight["official"]["release"],
         "mimic_code_commit": preflight["official"]["commit"],
         "source_manifest_sha256": preflight["official"]["source_manifest_sha256"],
+        "dependency_order": preflight["official"]["dependency_order"],
         "sql_hashes": preflight["official"]["sql_hashes"],
+        "vendor_hashes": preflight["official"]["vendor_hashes"],
         "item_manifest_version": preflight["official"]["item_manifest_version"],
         "item_manifest_sha256": preflight["official"]["item_manifest_sha256"],
         "raw_source_fingerprints": {

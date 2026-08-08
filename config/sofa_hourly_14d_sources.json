@@ -1,6 +1,6 @@
 {
   "score": "ICU-relative hourly SOFA through day 14",
-  "adaptation_version": "sofa-hourly-14d-v1",
+  "adaptation_version": "sofa-hourly-14d-v2",
   "mimic_code": {
     "repository": "https://github.com/MIT-LCP/mimic-code.git",
     "release": "v3.0.1",
@@ -22,14 +22,19 @@
     {
       "id": "explicit-component-missingness",
       "description": "Retains nullable rolling component scores in *_24hours_raw while preserving upstream COALESCE(component,0) behavior in the reported components and total."
+    },
+    {
+      "id": "elapsed-window-and-vasoactive-correction",
+      "description": "Adds the omitted leading segment to a partial final row so every exported window is exactly (endtime-24h,endtime], and scores only positive vasoactive rates from episodes lasting at least one hour."
     }
   ],
   "preserved_upstream_behavior": [
     "Twenty-four pre-ICU internal hourly rows seed the trailing 24-hour windows; only non-negative hour_index rows are exported.",
     "Hourly event intervals use starttime < charttime and endtime >= charttime.",
-    "Component scores use the maximum severity across the current and 23 preceding hourly rows.",
+    "Component scores use the current and 23 preceding hourly rows; a partial final interval additionally uses its exact omitted leading boundary segment.",
     "Urine output accepts an official urine-output-rate window only when uo_tm_24hr is between 22 and 30 hours and scales it to 24 hours.",
     "Arterial blood gases only are used for respiratory SOFA and ventilation status is evaluated at blood-gas charttime.",
+    "All earlier selected-stay urine-output rows are staged so the urine-rate LAG predecessor is preserved.",
     "Missing rolling components contribute zero to sofa_hourly_24h; missingness is exported separately."
   ]
 }

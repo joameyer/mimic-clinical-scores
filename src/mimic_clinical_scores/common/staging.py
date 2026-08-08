@@ -172,7 +172,12 @@ def _filter_sql(
             AND EXISTS (
                 SELECT 1 FROM pipeline_meta.cohort_context c
                 WHERE c.stay_id = raw.stay_id
-                  AND raw.charttime >= c.intime - CASE WHEN raw.itemid=223835 THEN INTERVAL '3' HOUR ELSE INTERVAL '1' HOUR END
+                  AND raw.charttime >= c.intime - CASE
+                    WHEN raw.itemid=223835 THEN INTERVAL '3' HOUR
+                    WHEN raw.itemid IN (223848,223849,224684,224688,224690,229314)
+                      THEN INTERVAL '2' HOUR
+                    ELSE INTERVAL '1' HOUR
+                  END
                   AND raw.charttime <= c.intime + INTERVAL '1' HOUR
             )
         """
@@ -250,9 +255,6 @@ def _filter_sql(
                 SELECT 1 FROM pipeline_meta.cohort_context c
                 WHERE c.stay_id = raw.stay_id
                   AND c.outtime IS NOT NULL
-                  AND raw.charttime > GREATEST(
-                    c.intime, c.outtime - INTERVAL '168' HOUR
-                  ) - INTERVAL '48' HOUR
                   AND raw.charttime <= c.outtime
             )
         """
@@ -309,7 +311,6 @@ def _filter_sql(
             AND EXISTS (
                 SELECT 1 FROM pipeline_meta.cohort_context c
                 WHERE c.stay_id = raw.stay_id
-                  AND raw.charttime > c.intime - INTERVAL '48' HOUR
                   AND raw.charttime <= LEAST(
                     COALESCE(c.outtime, c.intime + INTERVAL '336' HOUR),
                     c.intime + INTERVAL '336' HOUR

@@ -11,7 +11,13 @@ The primary key is `(stay_id, hours_before_discharge)`:
 - indexing continues backward through at most `167`;
 - stays shorter than seven days contribute only their ICU duration, with a partial earliest interval when needed.
 
-Every row reports the worst component score across its current interval and 23 preceding chronological intervals. Internal context extends before the earliest exported interval but is not exported. Thus the earliest row of a short stay can use qualifying pre-ICU evidence, consistently with the pinned hourly implementation.
+Every row reports the worst component score over the exact chronological interval
+`(endtime-24h,endtime]`. Ordinarily this is the current interval and 23 preceding
+hourly intervals. Where the earliest partial interval becomes the first of 24 output
+rows, version 2 separately evaluates the omitted leading segment and merges its
+component maxima. Internal context extends before the earliest exported interval but
+is not exported. Thus the earliest row of a short stay can use qualifying pre-ICU
+evidence.
 
 Stays with null or non-positive `outtime-intime` are excluded because reverse alignment is undefined. Validation and `coverage.json` report their count explicitly.
 
@@ -21,20 +27,41 @@ Scoring never filters on outcome. Raw `admissions.deathtime` and `hospital_expir
 
 - `death_recorded_by_icu_discharge`: `deathtime <= ICU outtime`;
 - `died_during_icu_stay`: `intime <= deathtime <= outtime`;
-- `alive_at_icu_discharge`: no death recorded by that ICU outtime;
+- `no_death_recorded_by_icu_discharge`: logical complement of
+  `death_recorded_by_icu_discharge`; it does not assert adjudicated survival;
 - `hospital_expire_flag`: death during the hospital admission.
 
-An ICU stay can be alive at its ICU discharge while its admission later has `hospital_expire_flag=1`. Multiple ICU stays in one admission retain their own ICU-discharge-relative classification. These fields describe recorded MIMIC timestamps and do not establish a clinical cause of death.
+An ICU stay can have no death recorded by its ICU discharge while its admission later
+has `hospital_expire_flag=1`. Multiple ICU stays in one admission retain their own
+ICU-discharge-relative classification. These fields describe recorded MIMIC timestamps
+and do not establish adjudicated survival or a clinical cause of death.
 
 ## Provenance and staging
 
 The score uses MIT-LCP `mimic-code` v3.0.1 at commit `c7e07560dc847e32cbb0b2890213e8e7cbd8bc7e`. The source hourly SOFA hash is `5af9c75bdaeb9342138a0fbc8cbef33b132508689e3ac492ab574af1c7ff05b0`.
 
-Thresholds, arterial P/F handling, ventilation-at-gas-time classification, vasopressor rules, urine-rate criteria, rolling maxima, and missing-as-zero total are unchanged. Adaptations are limited to the reverse grid, seven-day cap, explicit outtime exclusion, outcome annotation, and exposed nullable rolling components.
+Thresholds, arterial P/F handling, ventilation-at-gas-time classification,
+urine-rate criteria, and missing-as-zero total follow the pinned query. Adaptations
+include the reverse grid, seven-day cap, explicit outtime exclusion, exact correction
+of the partial-boundary rolling window, outcome annotation, exposed nullable rolling
+components, and the original SOFA requirement that scored positive vasoactive rates
+come from recorded episodes lasting at least one hour. Episode/hour overlap is
+half-open: `episode_start < hour_end` and `episode_end > hour_start`.
 
-Ordinary chart and lab events are retained from 24 hours before `max(intime, outtime-168h)` through `outtime`. Urine events begin 48 hours before that boundary because the urine-rate concept has a nested 24-hour lookback. FiO2/SpO2, ventilation, GCS, weight, and heart-rate timing IDs keep full selected-stay context. Infusions are retained by interval overlap. Admissions are retained only for cohort `hadm_id` values.
+Ordinary chart and lab events are retained from 24 hours before
+`max(intime, outtime-168h)` through `outtime`. All earlier audited urine rows for an
+eligible selected stay are retained through `outtime`, because the pinned urine-rate
+concept's `LAG(charttime)` makes the immediate predecessor necessary even when it lies
+outside an arbitrary 48-hour lower bound. FiO2/SpO2, ventilation, GCS, weight, and
+heart-rate timing IDs keep full selected-stay context. Infusions are retained by
+interval overlap. Admissions are retained only for cohort `hadm_id` values.
 
-Exact item IDs and hashes are in `itemid_manifest.v1.json`. Preflight verifies the recursive graph, six raw files, SQL hashes, headers, and cohort without scanning complete clinical events.
+Exact item IDs and hashes are resolved from the preserved `itemid_manifest.v1.json`
+plus the `itemid_manifest.v2.json` context overlay. Preflight verifies the recursive
+graph, six raw files, SQL hashes, headers, and cohort without scanning complete
+clinical events.
+
+Corrected outputs carry `adaptation_version='sofa-hourly-reverse-7d-v2'`.
 
 ## Missingness
 
@@ -82,4 +109,6 @@ squeue -j "$JOB_ID"
 - Missing components contribute zero to the total and can bias it downward.
 - Respiratory scoring requires arterial blood-gas evidence; no SpO2/FiO2 substitute is added.
 - Outcome flags are timestamp-derived and should not be interpreted as adjudicated ICU mortality.
-- Synthetic reference-versus-filtered equivalence is tested locally; real dev100 remains an HPC integration test.
+- Synthetic tests include the 25h15m partial-boundary counterexample, exact death-time
+  predicates, vasoactive duration/rate boundaries, and filtered-versus-unfiltered
+  equivalence; real dev100 remains an HPC integration test.

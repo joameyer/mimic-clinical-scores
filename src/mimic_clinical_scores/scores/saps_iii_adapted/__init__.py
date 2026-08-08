@@ -1,1 +1,1 @@
-"""Transparent MIMIC-IV adaptation of the SAPS III admission score."""
+"""Unvalidated MIMIC-IV proxy sensitivity calculation based on SAPS III."""

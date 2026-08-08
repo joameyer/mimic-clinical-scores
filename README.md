@@ -3,7 +3,7 @@
 This project computes clinical severity scores from raw MIMIC-IV with a protected
 stay-ID allowlist, filtered DuckDB staging, immutable official SQL, resumable state,
 and auditable exports. It implements official MIT-LCP SAPS II, an explicitly named
-MIMIC-IV adaptation of SAPS III, a documented classic first-day SOFA adaptation, an
+MIMIC-IV adaptation of SAPS III, a documented arterial first-day SOFA adaptation, an
 ICU-relative hourly SOFA trajectory through day 14, and a discharge-relative hourly
 SOFA trajectory over the final seven days. APS III and SOFA-2 are not implemented.
 
@@ -37,9 +37,10 @@ src/mimic_clinical_scores/
     staging_rules.py   inclusive admission-window retention rules
     saps_iii_adapted.sql
     reference.py       independent point/equation checks
-    itemid_manifest.v1.json
+    itemid_manifest.v1.json  preserved withdrawn-run provenance
+    itemid_manifest.v2.json
   scores/sofa_first_day_adapted/
-    specification.py   pinned classic SOFA dependencies and identity
+    specification.py   pinned first-day SOFA dependencies and adaptation identity
     staging_rules.py   first-day and episode-context retention rules
     sofa_first_day_adapted.sql
     scoring.py         score, evidence, and missingness projections
@@ -71,10 +72,12 @@ Select it with `--score saps_ii` (the backward-compatible default),
 
 `sofa_hourly_14d` emits one row per ICU-relative hour, stopping at raw ICU discharge
 or after 336 intervals. Hour 0 is `(intime, intime+1h]`; a partial discharge hour is
-retained. Each reported total uses the worst component score across the current and
-23 preceding hourly intervals. As in pinned MIT-LCP hourly SOFA, internal pre-ICU
-hours seed that rolling window but are not exported. Nullable rolling components are
-kept alongside the upstream zero-filled total so missingness remains visible. See the
+retained. Every reported component uses the exact chronological interval
+`(hour_end-24h, hour_end]`. Full hours use the current and 23 preceding rows; a partial
+discharge row additionally evaluates its omitted leading boundary segment. Internal
+pre-ICU context is not exported. Vasoactive rates must be positive and come from an
+episode lasting at least one hour. Nullable rolling components are kept alongside the
+zero-filled total so missingness remains visible. See the
 [hourly SOFA audit and deployment guide](docs/scores/sofa_hourly_14d.md).
 
 `sofa_hourly_reverse_7d` is independently aligned to ICU discharge: index 0 is the
@@ -84,13 +87,14 @@ ICU-discharge and hospital-death fields. Stays lacking usable raw `outtime` are 
 and excluded because reverse alignment is undefined. See the
 [reverse hourly SOFA audit](docs/scores/sofa_hourly_reverse_7d.md).
 
-## Classic first-day SOFA adapted
+## Arterial first-day SOFA adapted
 
-`sofa_first_day_adapted` produces one classic SOFA row per ICU stay. It executes
-pinned MIT-LCP measurement, ventilation, and vasopressor concepts and applies the
-classic six 0–4 organ-component thresholds. It restores the ventilated P/F 200–399
-branches missing from the legacy MIT first-day query and uses equivalent narrow
-first-day aggregates rather than the broad general-purpose first-day lab table. The
+`sofa_first_day_adapted` produces one explicitly adapted first-day SOFA row per ICU
+stay. It applies the original six 0–4 organ-component thresholds, restricts
+oxygenation to arterial blood gases, requires positive vasoactive doses from recorded
+episodes lasting at least one hour, and restores the ventilated P/F 200–399 branches
+missing from the legacy MIT first-day query. It uses narrow first-day aggregates
+rather than the broad general-purpose first-day lab table. The
 adaptations, time windows, source mapping, missingness semantics, and cluster commands
 are documented in the [SOFA audit](docs/scores/sofa_first_day_adapted.md). Classic
 SOFA has no direct mortality-probability output.
@@ -101,17 +105,21 @@ status, ICU-duration strata, and charted-FiO2 fallback age.
 
 ## SAPS III adapted
 
-MIT-LCP/mimic-code v3.0.1 contains no SAPS III concept, so this project does not call
-the new result official. `saps_iii_adapted` retains the 2005 point cut-offs, global
-mortality equation, and North American equation, but uses versioned, visible MIMIC
-proxies for facts structured MIMIC-IV cannot recover exactly. These include planned
-ICU admission, the stated admission reason, surgery planning, infection acquisition,
+MIT-LCP/mimic-code v3.0.1 contains no SAPS III concept. Version
+`saps-iii-adapted-v2` therefore does not export a proxy-filled value under an
+unqualified SAPS III name. `saps_iii_complete_case_score` remains null when required
+original variables cannot be recovered. A separate
+`saps_iii_proxy_total_unvalidated` and explicitly named proxy probability fields are
+available only for sensitivity analysis. They use versioned MIMIC proxies for planned
+ICU admission, stated admission reason, surgery planning/site, infection acquisition,
 NYHA IV, recent cancer therapy, pre-sedation GCS, and complete pre-ICU vasoactive
-therapy. See the full [source and adaptation audit](docs/scores/saps_iii_adapted.md).
+therapy. They are not validated SAPS III estimates. See the full
+[source and adaptation audit](docs/scores/saps_iii_adapted.md).
 
-SAPS III physiology uses the inclusive interval
-`[intime - 1 hour, intime + 1 hour]`, not the SAPS II first-day window. It therefore
-has separate filtered staging and cannot reuse a SAPS II DuckDB database.
+SAPS III physiology uses each current stay's inclusive interval
+`[intime - 1 hour, intime + 1 hour]`, not the SAPS II first-day window. Arterial
+oxygenation requires specimen value `ART.`; ventilatory support is paired at gas time.
+It therefore has separate filtered staging and cannot reuse a SAPS II DuckDB database.
 
 No code or configuration is imported from the previous mortality project. The blocked
 `static.parquet` is read only by `prepare-cohort`, and only its `stay_id` column is
@@ -449,16 +457,21 @@ Development outputs are under `outputs/dev100/saps_ii`; full outputs are under
 
 - `scores.parquet`: one deterministic row per stay with raw identifiers/timestamps,
   ICU availability fields, official total/probability/windows, and all 15 components;
-- `score_missingness.parquet`: patient-level Boolean component indicators, missing
-  count, and complete-components flag;
+- `score_missingness.parquet`: stay-level or stay-hour Boolean component indicators,
+  missing count, and complete-components flag;
 - `component_missingness.csv`: component counts/percentages overall and by short-stay
-  stratum;
+  stratum; hourly outputs call the stay-hour denominator `row_count`;
 - `coverage.json`: cohort matching, score/probability, and component coverage overall
   and by duration stratum;
 - `staging_statistics.json`: raw fingerprints/sizes/scan rows, retained rows/fractions,
   filters, and elapsed times;
 - `run_manifest.json`: complete run identity, provenance, runtime, SLURM metadata,
   artifacts, statistics, coverage, timestamps, and output paths.
+
+Validation recomputes the declared projections and requires exact schema and row
+equality for both Parquet files. It also reconciles CSV/JSON summaries with the score
+tables, verifies hourly timestamps and duration-derived row counts, and checks the
+manifest against the immutable database identity.
 
 The official SQL computes the total using `COALESCE(component_score, 0)`. A non-null
 SAPS II total therefore does not mean the inputs were complete. Original null component
@@ -501,4 +514,5 @@ real-data integrations were run only on the HPC cluster, never locally; and v3.0
 choices—including a fixed 24-hour window beyond ICU discharge and its service
 ordering—are preserved even when they may be surprising. SAPS III adapted has no
 MIT-LCP reference SQL and cannot reconstruct several original admission-time facts;
-its proxy flags and documentation must accompany analysis. APS III is not implemented.
+only its explicitly unvalidated proxy fields are populated, and they must not be
+presented as validated SAPS III. APS III is not implemented.

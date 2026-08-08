@@ -2,9 +2,9 @@
 -- Upstream SHA-256: 5af9c75bdaeb9342138a0fbc8cbef33b132508689e3ac492ab574af1c7ff05b0
 -- Adaptations: replace charttime/wall-clock icustay_hourly with an ICU-intime-relative
 -- grid; retain upstream -24-hour internal context; stop output at ICU discharge or
--- 336 one-hour intervals; retain nullable rolling component values alongside the
--- upstream COALESCE-to-zero total. All component thresholds and event predicates are
--- otherwise unchanged.
+-- 336 one-hour intervals; retain nullable rolling component values; correct a partial
+-- discharge interval with its missing leading boundary segment; and require positive,
+-- at-least-one-hour vasoactive episodes. Component thresholds are unchanged.
 DROP TABLE IF EXISTS mimiciv_derived.sofa_hourly_14d;
 CREATE TABLE mimiciv_derived.sofa_hourly_14d AS
 WITH grid_bounds AS (
@@ -23,8 +23,13 @@ WITH grid_bounds AS (
           TRY_CAST(CEIL(DATE_DIFF('microseconds', intime, outtime) / 3600000000.0) AS INTEGER) - 1
         )
       )
-    END AS last_output_hour
+    END AS last_output_hour,
+    LEAST(
+      COALESCE(outtime, intime + INTERVAL '336' HOUR),
+      intime + INTERVAL '336' HOUR
+    ) AS last_output_end
   FROM mimiciv_icu.icustays
+  WHERE outtime IS NULL OR outtime > intime
 ), grid AS (
   SELECT
     gb.subject_id,
@@ -35,7 +40,7 @@ WITH grid_bounds AS (
     TRY_CAST(hour_value AS INTEGER) AS hr
   FROM grid_bounds gb
   CROSS JOIN UNNEST(GENERATE_SERIES(-24, gb.last_output_hour)) AS hours(hour_value)
-), co AS (
+), regular_co AS (
   SELECT
     subject_id,
     hadm_id,
@@ -46,8 +51,30 @@ WITH grid_bounds AS (
       WHEN hr < 0 THEN intime + (hr + 1) * INTERVAL '1' HOUR
       WHEN outtime IS NULL THEN intime + (hr + 1) * INTERVAL '1' HOUR
       ELSE LEAST(intime + (hr + 1) * INTERVAL '1' HOUR, outtime)
-    END AS endtime
+    END AS endtime,
+    FALSE AS is_boundary,
+    NULL::INTEGER AS boundary_target_hr
   FROM grid
+), boundary_co AS (
+  -- A partial final interval shifts the true 24-hour start away from the
+  -- intime-aligned internal grid. This extra interval is exactly the omitted
+  -- leading segment; its component maxima are merged only into that final row.
+  SELECT
+    subject_id,
+    hadm_id,
+    stay_id,
+    -1000000 AS hr,
+    last_output_end - INTERVAL '24' HOUR AS starttime,
+    intime + (last_output_hour - 23) * INTERVAL '1' HOUR AS endtime,
+    TRUE AS is_boundary,
+    last_output_hour AS boundary_target_hr
+  FROM grid_bounds
+  WHERE last_output_end - INTERVAL '24' HOUR
+        < intime + (last_output_hour - 23) * INTERVAL '1' HOUR
+), co AS (
+  SELECT * FROM regular_co
+  UNION ALL
+  SELECT * FROM boundary_co
 ), pafi AS (
   SELECT
     ie.stay_id,
@@ -135,27 +162,31 @@ WITH grid_bounds AS (
   SELECT
     co.stay_id,
     co.hr,
-    MAX(epi.vaso_rate) AS rate_epinephrine,
-    MAX(nor.vaso_rate) AS rate_norepinephrine,
-    MAX(dop.vaso_rate) AS rate_dopamine,
-    MAX(dob.vaso_rate) AS rate_dobutamine
+    MAX(CASE WHEN epi.vaso_rate > 0 THEN epi.vaso_rate END) AS rate_epinephrine,
+    MAX(CASE WHEN nor.vaso_rate > 0 THEN nor.vaso_rate END) AS rate_norepinephrine,
+    MAX(CASE WHEN dop.vaso_rate > 0 THEN dop.vaso_rate END) AS rate_dopamine,
+    MAX(CASE WHEN dob.vaso_rate > 0 THEN dob.vaso_rate END) AS rate_dobutamine
   FROM co
   LEFT JOIN mimiciv_derived.epinephrine AS epi
     ON co.stay_id = epi.stay_id
-    AND co.endtime > epi.starttime
-    AND co.endtime <= epi.endtime
+    AND epi.starttime < co.endtime
+    AND epi.endtime > co.starttime
+    AND epi.endtime >= epi.starttime + INTERVAL '1' HOUR
   LEFT JOIN mimiciv_derived.norepinephrine AS nor
     ON co.stay_id = nor.stay_id
-    AND co.endtime > nor.starttime
-    AND co.endtime <= nor.endtime
+    AND nor.starttime < co.endtime
+    AND nor.endtime > co.starttime
+    AND nor.endtime >= nor.starttime + INTERVAL '1' HOUR
   LEFT JOIN mimiciv_derived.dopamine AS dop
     ON co.stay_id = dop.stay_id
-    AND co.endtime > dop.starttime
-    AND co.endtime <= dop.endtime
+    AND dop.starttime < co.endtime
+    AND dop.endtime > co.starttime
+    AND dop.endtime >= dop.starttime + INTERVAL '1' HOUR
   LEFT JOIN mimiciv_derived.dobutamine AS dob
     ON co.stay_id = dob.stay_id
-    AND co.endtime > dob.starttime
-    AND co.endtime <= dob.endtime
+    AND dob.starttime < co.endtime
+    AND dob.endtime > co.starttime
+    AND dob.endtime >= dob.starttime + INTERVAL '1' HOUR
   WHERE
     NOT epi.stay_id IS NULL OR NOT nor.stay_id IS NULL
     OR NOT dop.stay_id IS NULL OR NOT dob.stay_id IS NULL
@@ -168,6 +199,8 @@ WITH grid_bounds AS (
     co.hr,
     co.starttime,
     co.endtime,
+    co.is_boundary,
+    co.boundary_target_hr,
     pf.pao2fio2ratio_novent,
     pf.pao2fio2ratio_vent,
     vaso.rate_epinephrine,
@@ -220,7 +253,9 @@ WITH grid_bounds AS (
     END AS liver,
     CASE
       WHEN rate_dopamine > 15 OR rate_epinephrine > 0.1 OR rate_norepinephrine > 0.1 THEN 4
-      WHEN rate_dopamine > 5 OR rate_epinephrine <= 0.1 OR rate_norepinephrine <= 0.1 THEN 3
+      WHEN rate_dopamine > 5
+        OR (rate_epinephrine > 0 AND rate_epinephrine <= 0.1)
+        OR (rate_norepinephrine > 0 AND rate_norepinephrine <= 0.1) THEN 3
       WHEN rate_dopamine > 0 OR rate_dobutamine > 0 THEN 2
       WHEN meanbp_min < 70 THEN 1
       WHEN COALESCE(meanbp_min, rate_dopamine, rate_dobutamine, rate_epinephrine, rate_norepinephrine) IS NULL THEN NULL
@@ -245,7 +280,7 @@ WITH grid_bounds AS (
       ELSE 0
     END AS renal
   FROM scorecomp
-), rolling AS (
+), rolling_base AS (
   SELECT
     s.*,
     MAX(respiration) OVER w AS respiration_24hours_raw,
@@ -255,10 +290,28 @@ WITH grid_bounds AS (
     MAX(cns) OVER w AS cns_24hours_raw,
     MAX(renal) OVER w AS renal_24hours_raw
   FROM scorecalc AS s
+  WHERE NOT is_boundary
   WINDOW w AS (
     PARTITION BY stay_id ORDER BY hr NULLS FIRST
     ROWS BETWEEN 23 PRECEDING AND CURRENT ROW
   )
+), rolling AS (
+  SELECT
+    rb.* EXCLUDE (
+      respiration_24hours_raw, coagulation_24hours_raw, liver_24hours_raw,
+      cardiovascular_24hours_raw, cns_24hours_raw, renal_24hours_raw
+    ),
+    GREATEST(rb.respiration_24hours_raw, b.respiration) AS respiration_24hours_raw,
+    GREATEST(rb.coagulation_24hours_raw, b.coagulation) AS coagulation_24hours_raw,
+    GREATEST(rb.liver_24hours_raw, b.liver) AS liver_24hours_raw,
+    GREATEST(rb.cardiovascular_24hours_raw, b.cardiovascular) AS cardiovascular_24hours_raw,
+    GREATEST(rb.cns_24hours_raw, b.cns) AS cns_24hours_raw,
+    GREATEST(rb.renal_24hours_raw, b.renal) AS renal_24hours_raw
+  FROM rolling_base AS rb
+  LEFT JOIN scorecalc AS b
+    ON b.is_boundary
+    AND rb.stay_id = b.stay_id
+    AND rb.hr = b.boundary_target_hr
 ), score_final AS (
   SELECT
     rolling.*,

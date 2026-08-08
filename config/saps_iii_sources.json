@@ -1,7 +1,15 @@
 {
-  "adaptation_version": "saps-iii-adapted-v1",
+  "adaptation_version": "saps-iii-adapted-v2",
   "model": "SAPS III admission score (2005)",
-  "upstream_implementation": "No MIT-LCP/mimic-code SAPS III concept exists in release v3.0.1; this is a project-owned, explicitly adapted implementation.",
+  "upstream_implementation": "No MIT-LCP/mimic-code SAPS III concept exists in release v3.0.1. Version 2 is a project-owned proxy sensitivity calculation; unavailable original variables remain null and published equations are exported only with explicit proxy/unvalidated names.",
+  "v2_interpretation_policy": {
+    "wbc_extremum": "highest, following the original 2005 data-definition supplement; the later one-page score sheet has a conflicting lowest label",
+    "pao2_specimen": "same-specimen ART. evidence is required",
+    "ph_specimen": "arterial or venous, as explicitly permitted by the original supplement",
+    "temperature": "central site used directly; documented peripheral site adjusted by +0.5 C; unknown site unavailable",
+    "unrecoverable_original_variables": "null in original component fields; versioned proxy fields are retained only for sensitivity analysis",
+    "probability_status": "published equation transcription applied only to an explicitly named unvalidated proxy total"
+  },
   "sources": [
     {
       "title": "SAPS 3 Admission Score Sheet / Score Algorithm",

@@ -49,7 +49,7 @@ EXPECTED_HEADERS.update({
 
 
 def load_itemid_manifest() -> dict[str, Any]:
-    path = files("mimic_clinical_scores.scores.saps_iii_adapted").joinpath("itemid_manifest.v1.json")
+    path = files("mimic_clinical_scores.scores.saps_iii_adapted").joinpath("itemid_manifest.v2.json")
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -65,13 +65,14 @@ class SAPSIIIAdaptedSpecification:
     component_columns: tuple[str, ...] = COMPONENT_COLUMNS
     required_raw_tables: tuple[str, ...] = tuple(EXPECTED_HEADERS)
     expected_headers: dict[str, tuple[str, ...]] = None  # type: ignore[assignment]
-    score_columns: tuple[str, ...] = ("saps_iii_adapted",)
+    score_columns: tuple[str, ...] = ("saps_iii_proxy_total_unvalidated",)
     probability_columns: tuple[str, ...] = (
-        "saps_iii_prob_global_adapted", "saps_iii_prob_north_america_adapted"
+        "saps_iii_prob_global_proxy_unvalidated",
+        "saps_iii_prob_north_america_proxy_unvalidated",
     )
     score_table: str = "mimiciv_derived.saps_iii_adapted"
-    provenance_label: str = "SAPS III 2005 point model with versioned MIMIC-IV proxy adaptation"
-    item_manifest_version: str = "saps-iii-adapted-v1"
+    provenance_label: str = "Unvalidated SAPS III 2005 proxy sensitivity calculation for MIMIC-IV"
+    item_manifest_version: str = "saps-iii-adapted-v2"
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "expected_headers", EXPECTED_HEADERS)

@@ -1,0 +1,22 @@
+{
+  "manifest_version": "sofa-first-day-adapted-v2",
+  "base_manifest": "itemid_manifest.v1.json",
+  "entry_overrides": [
+    {
+      "source_concept": "medication/dobutamine.sql",
+      "reason_for_retention": "derive cardiovascular SOFA from episodes lasting at least one hour"
+    },
+    {
+      "source_concept": "medication/dopamine.sql",
+      "reason_for_retention": "derive cardiovascular SOFA from episodes lasting at least one hour"
+    },
+    {
+      "source_concept": "medication/epinephrine.sql",
+      "reason_for_retention": "derive cardiovascular SOFA from positive-rate episodes lasting at least one hour"
+    },
+    {
+      "source_concept": "medication/norepinephrine.sql",
+      "reason_for_retention": "derive cardiovascular SOFA from positive-rate episodes lasting at least one hour"
+    }
+  ]
+}

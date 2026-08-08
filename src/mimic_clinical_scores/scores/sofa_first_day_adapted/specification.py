@@ -66,10 +66,18 @@ EXPECTED_HEADERS = {
 
 
 def load_itemid_manifest() -> dict[str, Any]:
-    path = files("mimic_clinical_scores.scores.sofa_first_day_adapted").joinpath(
-        "itemid_manifest.v1.json"
+    package = files("mimic_clinical_scores.scores.sofa_first_day_adapted")
+    overlay = json.loads(
+        package.joinpath("itemid_manifest.v2.json").read_text(encoding="utf-8")
     )
-    return json.loads(path.read_text(encoding="utf-8"))
+    base = json.loads(package.joinpath(overlay["base_manifest"]).read_text(encoding="utf-8"))
+    entries = [dict(entry) for entry in base["entries"]]
+    for override in overlay["entry_overrides"]:
+        matches = [entry for entry in entries if entry["source_concept"] == override["source_concept"]]
+        if len(matches) != 1:
+            raise ValueError(f"Manifest override must match once: {override['source_concept']}")
+        matches[0].update({key: value for key, value in override.items() if key != "source_concept"})
+    return {**base, "manifest_version": overlay["manifest_version"], "entries": entries}
 
 
 @dataclass(frozen=True)
@@ -86,10 +94,11 @@ class SOFAFirstDayAdaptedSpecification:
     probability_columns: tuple[str, ...] = ()
     score_table: str = "mimiciv_derived.sofa_first_day_adapted"
     provenance_label: str = (
-        "MIT-LCP mimic-code v3.0.1 classic first-day SOFA with documented "
-        "ventilated PaO2/FiO2 correction and equivalent narrow first-day aggregates"
+        "MIT-LCP mimic-code v3.0.1 first-day SOFA adaptation requiring arterial "
+        "blood gases and at-least-one-hour vasoactive episodes, with corrected "
+        "ventilated PaO2/FiO2 branches"
     )
-    item_manifest_version: str = "sofa-first-day-adapted-v1"
+    item_manifest_version: str = "sofa-first-day-adapted-v2"
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "expected_headers", EXPECTED_HEADERS)
@@ -132,6 +141,10 @@ class SOFAFirstDayAdaptedSpecification:
             concept.sql_relative_path: sha256_file(self.vendor_root(project_root) / concept.sql_relative_path)
             for concept in self.concepts
         }
+        upstream_first_day = "mimic-iv/concepts_duckdb/firstday/first_day_sofa.sql"
+        hashes[f"upstream:{upstream_first_day}"] = sha256_file(
+            self.vendor_root(project_root) / upstream_first_day
+        )
         hashes[f"project:{self.score_concept.sql_relative_path}"] = sha256_file(
             self.score_root() / self.score_concept.sql_relative_path
         )

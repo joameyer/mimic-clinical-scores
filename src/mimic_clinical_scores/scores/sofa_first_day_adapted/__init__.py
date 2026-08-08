@@ -1,2 +1,1 @@
-"""Documented first-day classic SOFA adaptation for MIMIC-IV."""
-
+"""Documented arterial first-day SOFA adaptation for MIMIC-IV."""

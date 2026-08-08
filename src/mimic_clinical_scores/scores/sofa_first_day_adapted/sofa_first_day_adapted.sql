@@ -1,7 +1,8 @@
 -- Project adaptation of MIT-LCP mimic-code v3.0.1 first_day_sofa.sql.
 -- Upstream SHA-256: 02736bd4faf9885fed67de777ec85852b50e93ac1ddc03bd6e5039216ce3d86e
--- Adaptations: inline only SOFA-used first-day aggregates, and restore the
--- ventilated P/F <300 and <400 respiratory branches present in classic SOFA.
+-- Adaptations: inline only SOFA-used first-day aggregates; require arterial
+-- blood gases; restore the ventilated P/F <300 and <400 respiratory branches;
+-- and require every scored vasoactive episode to last at least one hour.
 DROP TABLE IF EXISTS mimiciv_derived.sofa_first_day_adapted;
 CREATE TABLE mimiciv_derived.sofa_first_day_adapted AS
 WITH vaso_stg AS (
@@ -10,30 +11,34 @@ WITH vaso_stg AS (
   JOIN mimiciv_derived.norepinephrine mv ON ie.stay_id = mv.stay_id
     AND mv.starttime >= ie.intime - INTERVAL '6' HOUR
     AND mv.starttime <= ie.intime + INTERVAL '1' DAY
+    AND mv.endtime >= mv.starttime + INTERVAL '1' HOUR
   UNION ALL
   SELECT ie.stay_id, 'epinephrine', mv.vaso_rate
   FROM mimiciv_icu.icustays ie
   JOIN mimiciv_derived.epinephrine mv ON ie.stay_id = mv.stay_id
     AND mv.starttime >= ie.intime - INTERVAL '6' HOUR
     AND mv.starttime <= ie.intime + INTERVAL '1' DAY
+    AND mv.endtime >= mv.starttime + INTERVAL '1' HOUR
   UNION ALL
   SELECT ie.stay_id, 'dobutamine', mv.vaso_rate
   FROM mimiciv_icu.icustays ie
   JOIN mimiciv_derived.dobutamine mv ON ie.stay_id = mv.stay_id
     AND mv.starttime >= ie.intime - INTERVAL '6' HOUR
     AND mv.starttime <= ie.intime + INTERVAL '1' DAY
+    AND mv.endtime >= mv.starttime + INTERVAL '1' HOUR
   UNION ALL
   SELECT ie.stay_id, 'dopamine', mv.vaso_rate
   FROM mimiciv_icu.icustays ie
   JOIN mimiciv_derived.dopamine mv ON ie.stay_id = mv.stay_id
     AND mv.starttime >= ie.intime - INTERVAL '6' HOUR
     AND mv.starttime <= ie.intime + INTERVAL '1' DAY
+    AND mv.endtime >= mv.starttime + INTERVAL '1' HOUR
 ), vaso AS (
   SELECT ie.stay_id,
-    MAX(CASE WHEN treatment = 'norepinephrine' THEN rate END) AS rate_norepinephrine,
-    MAX(CASE WHEN treatment = 'epinephrine' THEN rate END) AS rate_epinephrine,
-    MAX(CASE WHEN treatment = 'dopamine' THEN rate END) AS rate_dopamine,
-    MAX(CASE WHEN treatment = 'dobutamine' THEN rate END) AS rate_dobutamine
+    MAX(CASE WHEN treatment = 'norepinephrine' AND rate > 0 THEN rate END) AS rate_norepinephrine,
+    MAX(CASE WHEN treatment = 'epinephrine' AND rate > 0 THEN rate END) AS rate_epinephrine,
+    MAX(CASE WHEN treatment = 'dopamine' AND rate > 0 THEN rate END) AS rate_dopamine,
+    MAX(CASE WHEN treatment = 'dobutamine' AND rate > 0 THEN rate END) AS rate_dobutamine
   FROM mimiciv_icu.icustays ie
   LEFT JOIN vaso_stg v USING (stay_id)
   GROUP BY ie.stay_id
@@ -44,6 +49,7 @@ WITH vaso_stg AS (
   LEFT JOIN mimiciv_derived.bg bg ON ie.subject_id = bg.subject_id
     AND bg.charttime >= ie.intime - INTERVAL '6' HOUR
     AND bg.charttime <= ie.intime + INTERVAL '1' DAY
+    AND bg.specimen = 'ART.'
   LEFT JOIN mimiciv_derived.ventilation vd ON ie.stay_id = vd.stay_id
     AND bg.charttime >= vd.starttime AND bg.charttime <= vd.endtime
     AND vd.ventilation_status = 'InvasiveVent'
@@ -126,7 +132,9 @@ WITH vaso_stg AS (
       WHEN bilirubin_max >= 2 THEN 2 WHEN bilirubin_max >= 1.2 THEN 1
       WHEN bilirubin_max IS NULL THEN NULL ELSE 0 END AS liver_score,
     CASE WHEN rate_dopamine > 15 OR rate_epinephrine > 0.1 OR rate_norepinephrine > 0.1 THEN 4
-      WHEN rate_dopamine > 5 OR rate_epinephrine <= 0.1 OR rate_norepinephrine <= 0.1 THEN 3
+      WHEN rate_dopamine > 5
+        OR (rate_epinephrine > 0 AND rate_epinephrine <= 0.1)
+        OR (rate_norepinephrine > 0 AND rate_norepinephrine <= 0.1) THEN 3
       WHEN rate_dopamine > 0 OR rate_dobutamine > 0 THEN 2
       WHEN mbp_min < 70 THEN 1
       WHEN COALESCE(mbp_min, rate_dopamine, rate_dobutamine, rate_epinephrine, rate_norepinephrine) IS NULL THEN NULL
@@ -145,6 +153,6 @@ SELECT *,
   COALESCE(respiration_score, 0) + COALESCE(coagulation_score, 0)
   + COALESCE(liver_score, 0) + COALESCE(cardiovascular_score, 0)
   + COALESCE(cns_score, 0) + COALESCE(renal_score, 0) AS sofa_first_day_adapted,
-  'sofa-first-day-adapted-v1' AS adaptation_version,
+  'sofa-first-day-adapted-v2' AS adaptation_version,
   TRUE AS ventilated_pf_correction_applied
 FROM components;

@@ -15,8 +15,7 @@ def scores_projection_sql() -> str:
           i.intime, i.outtime,
           DATE_DIFF('microseconds', i.intime, i.outtime) / 3600000000.0 AS icu_los_hours,
           s.starttime AS hour_start, s.endtime AS hour_end,
-          GREATEST(i.intime - INTERVAL '23' HOUR, s.endtime - INTERVAL '24' HOUR)
-            AS trailing_window_start,
+          s.endtime - INTERVAL '24' HOUR AS trailing_window_start,
           s.endtime AS trailing_window_end,
           s.sofa_24hours AS sofa_hourly_24h,
           {rolling},
@@ -25,7 +24,7 @@ def scores_projection_sql() -> str:
           s.rate_epinephrine, s.rate_norepinephrine,
           s.rate_dopamine, s.rate_dobutamine, s.meanbp_min, s.gcs_min,
           s.uo_24hr, s.bilirubin_max, s.creatinine_max, s.platelet_min,
-          'sofa-hourly-14d-v1' AS adaptation_version
+          'sofa-hourly-14d-v2' AS adaptation_version
         FROM {TABLE} s
         JOIN mimiciv_icu.icustays i USING (stay_id)
         ORDER BY s.stay_id, s.hr

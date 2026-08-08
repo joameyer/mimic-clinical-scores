@@ -47,10 +47,18 @@ EXPECTED_HEADERS = {
 
 
 def load_itemid_manifest() -> dict[str, Any]:
-    path = files("mimic_clinical_scores.scores.sofa_hourly_reverse_7d").joinpath(
-        "itemid_manifest.v1.json"
+    package = files("mimic_clinical_scores.scores.sofa_hourly_reverse_7d")
+    overlay = json.loads(
+        package.joinpath("itemid_manifest.v2.json").read_text(encoding="utf-8")
     )
-    return json.loads(path.read_text(encoding="utf-8"))
+    base = json.loads(package.joinpath(overlay["base_manifest"]).read_text(encoding="utf-8"))
+    entries = [dict(entry) for entry in base["entries"]]
+    for override in overlay["entry_overrides"]:
+        matches = [entry for entry in entries if entry["source_concept"] == override["source_concept"]]
+        if len(matches) != 1:
+            raise ValueError(f"Manifest override must match once: {override['source_concept']}")
+        matches[0].update({key: value for key, value in override.items() if key != "source_concept"})
+    return {**base, "manifest_version": overlay["manifest_version"], "entries": entries}
 
 
 @dataclass(frozen=True)
@@ -68,9 +76,9 @@ class SOFAHourlyReverse7dSpecification:
     score_table: str = "mimiciv_derived.sofa_hourly_reverse_7d"
     provenance_label: str = (
         "MIT-LCP mimic-code v3.0.1 hourly SOFA adapted to a discharge-relative "
-        "seven-day grid, without mortality-based cohort filtering"
+        "seven-day grid with exact elapsed 24-hour windows, without mortality filtering"
     )
-    item_manifest_version: str = "sofa-hourly-reverse-7d-v1"
+    item_manifest_version: str = "sofa-hourly-reverse-7d-v2"
     output_granularity: str = "stay_hour"
     primary_key_columns: tuple[str, ...] = ("stay_id", "hours_before_discharge")
     requires_outtime: bool = True

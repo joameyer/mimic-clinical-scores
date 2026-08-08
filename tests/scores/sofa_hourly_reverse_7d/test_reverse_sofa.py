@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import duckdb
+import json
 
 from mimic_clinical_scores.common.cohort import inspect_cohort
 from mimic_clinical_scores.common.concepts import build_concepts, execute_untracked
@@ -142,7 +143,9 @@ def test_reverse_grid_cap_partial_interval_and_death_annotation(project_root) ->
     con.execute(
         "INSERT INTO mimiciv_icu.icustays VALUES "
         "(1,10,100,TIMESTAMP '2100-01-01 00:00:00',TIMESTAMP '2100-01-01 02:15:00'),"
-        "(2,20,200,TIMESTAMP '2100-01-01 00:00:00',TIMESTAMP '2100-01-09 08:00:00')"
+        "(2,20,200,TIMESTAMP '2100-01-01 00:00:00',TIMESTAMP '2100-01-09 08:00:00'),"
+        "(3,30,300,TIMESTAMP '2100-01-01 00:00:00',TIMESTAMP '2100-01-02 01:15:00'),"
+        "(4,40,400,TIMESTAMP '2100-01-01 00:00:00',TIMESTAMP '2100-01-01 02:00:00')"
     )
     con.execute(
         "CREATE TABLE mimiciv_hosp.admissions(hadm_id INTEGER,deathtime TIMESTAMP,"
@@ -150,7 +153,7 @@ def test_reverse_grid_cap_partial_interval_and_death_annotation(project_root) ->
     )
     con.execute(
         "INSERT INTO mimiciv_hosp.admissions VALUES "
-        "(10,TIMESTAMP '2100-01-01 02:15:00',1),(20,NULL,0)"
+        "(10,TIMESTAMP '2100-01-01 02:15:00',1),(20,NULL,0),(30,NULL,0),(40,NULL,0)"
     )
     definitions = {
         "bg": "subject_id INTEGER,charttime TIMESTAMP,pao2fio2ratio DOUBLE,specimen VARCHAR",
@@ -168,6 +171,20 @@ def test_reverse_grid_cap_partial_interval_and_death_annotation(project_root) ->
     }
     for table, columns in definitions.items():
         con.execute(f"CREATE TABLE mimiciv_derived.{table}({columns})")
+    con.execute(
+        "INSERT INTO mimiciv_derived.vitalsign VALUES "
+        "(300,TIMESTAMP '2099-12-31 23:30:00',60),"
+        "(400,TIMESTAMP '2100-01-01 00:30:00',80)"
+    )
+    con.execute(
+        "INSERT INTO mimiciv_derived.epinephrine VALUES "
+        "(300,TIMESTAMP '2100-01-01',TIMESTAMP '2100-01-01 02:00:00',0)"
+    )
+    con.execute(
+        "INSERT INTO mimiciv_derived.norepinephrine VALUES "
+        "(300,TIMESTAMP '2100-01-01',TIMESTAMP '2100-01-01 00:59:00',0.05),"
+        "(400,TIMESTAMP '2100-01-01',TIMESTAMP '2100-01-01 01:00:00',0.05)"
+    )
     execute_untracked(
         con,
         concepts=(SOFA_HOURLY_REVERSE_7D_SPEC.score_concept,),
@@ -189,6 +206,16 @@ def test_reverse_grid_cap_partial_interval_and_death_annotation(project_root) ->
         "SELECT COUNT(*),MAX(hours_before_discharge) FROM "
         "mimiciv_derived.sofa_hourly_reverse_7d WHERE stay_id=200"
     ).fetchone() == (168, 167)
+    assert con.execute(
+        "SELECT hours_before_discharge,cardiovascular_24hours_raw FROM "
+        "mimiciv_derived.sofa_hourly_reverse_7d WHERE stay_id=300 "
+        "AND hours_before_discharge IN (1,2,3) ORDER BY hours_before_discharge DESC"
+    ).fetchall() == [(3, 1), (2, 1), (1, None)]
+    assert con.execute(
+        "SELECT hours_before_discharge,cardiovascular,cardiovascular_24hours_raw FROM "
+        "mimiciv_derived.sofa_hourly_reverse_7d WHERE stay_id=400 "
+        "ORDER BY hours_before_discharge"
+    ).fetchall() == [(0, None, 3), (1, 3, 3)]
     mortality = con.execute(
         SOFA_HOURLY_REVERSE_7D_SPEC.scores_projection_sql().replace(
             "ORDER BY s.stay_id, s.hours_before_discharge", ""
@@ -198,10 +225,32 @@ def test_reverse_grid_cap_partial_interval_and_death_annotation(project_root) ->
     record = dict(zip(names, mortality))
     assert record["died_during_icu_stay"] is True
     assert record["death_recorded_by_icu_discharge"] is True
-    assert record["alive_at_icu_discharge"] is False
+    assert record["no_death_recorded_by_icu_discharge"] is False
+    no_record = con.execute(
+        "SELECT death_recorded_by_icu_discharge,no_death_recorded_by_icu_discharge "
+        "FROM (" + SOFA_HOURLY_REVERSE_7D_SPEC.scores_projection_sql().replace(
+            "ORDER BY s.stay_id, s.hours_before_discharge", ""
+        ) + ") WHERE stay_id=200 LIMIT 1"
+    ).fetchone()
+    assert no_record == (False, True)
     con.close()
 
 
-def test_reverse_manifest_is_versioned() -> None:
+def test_reverse_manifest_is_versioned(project_root) -> None:
     manifest = load_itemid_manifest()
-    assert manifest["manifest_version"] == "sofa-hourly-reverse-7d-v1"
+    assert manifest["manifest_version"] == "sofa-hourly-reverse-7d-v2"
+    historical = json.loads(
+        (project_root / "src/mimic_clinical_scores/scores/sofa_hourly_reverse_7d/"
+         "itemid_manifest.v1.json").read_text(encoding="utf-8")
+    )
+    assert historical["manifest_version"] == "sofa-hourly-reverse-7d-v1"
+    urine = next(
+        entry for entry in manifest["entries"]
+        if entry["source_concept"] == "measurement/urine_output.sql"
+    )
+    assert urine["required_time_context"] == "all earlier selected-stay rows through outtime"
+    assert all(
+        "at least one hour" in entry["reason_for_retention"]
+        for entry in manifest["entries"]
+        if entry["raw_table"] == "mimiciv_icu.inputevents"
+    )
