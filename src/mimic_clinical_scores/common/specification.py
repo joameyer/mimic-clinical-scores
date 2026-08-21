@@ -40,7 +40,7 @@ class ScoreSpecification(Protocol):
     primary_key_columns: tuple[str, ...]
     requires_outtime: bool
     hour_index_column: str
-    maximum_hour_index: int
+    maximum_hour_index: int | None
 
     def vendor_root(self, project_root: Path) -> Path: ...
 

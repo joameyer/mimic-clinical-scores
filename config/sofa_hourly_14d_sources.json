@@ -1,6 +1,6 @@
 {
   "score": "ICU-relative hourly SOFA through day 14",
-  "adaptation_version": "sofa-hourly-14d-v2",
+  "adaptation_version": "sofa-hourly-14d-v3",
   "mimic_code": {
     "repository": "https://github.com/MIT-LCP/mimic-code.git",
     "release": "v3.0.1",
@@ -26,6 +26,10 @@
     {
       "id": "elapsed-window-and-vasoactive-correction",
       "description": "Adds the omitted leading segment to a partial final row so every exported window is exactly (endtime-24h,endtime], and scores only positive vasoactive rates from episodes lasting at least one hour."
+    },
+    {
+      "id": "composite-input-audit-columns",
+      "description": "Retains the GCS eye/verbal/motor observations, PaO2 and effective FiO2, and urine volume and effective duration associated with the hourly observation selected by each composite score input."
     }
   ],
   "preserved_upstream_behavior": [

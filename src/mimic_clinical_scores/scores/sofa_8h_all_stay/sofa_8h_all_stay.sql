@@ -1,14 +1,13 @@
 -- Adaptation of MIT-LCP mimic-code v3.0.1 concepts_duckdb/score/sofa.sql.
 -- Upstream SHA-256: 5af9c75bdaeb9342138a0fbc8cbef33b132508689e3ac492ab574af1c7ff05b0
--- Adaptations: replace charttime/wall-clock icustay_hourly with an ICU-intime-relative
--- grid; retain upstream -24-hour internal context; stop output at ICU discharge or
--- 336 one-hour intervals; retain nullable rolling component values; correct a partial
--- discharge interval with its missing leading boundary segment; and require positive,
--- at-least-one-hour vasoactive episodes. The observations selected by composite
--- inputs retain their intermediate values for auditability. Component thresholds are
--- unchanged.
-DROP TABLE IF EXISTS mimiciv_derived.sofa_hourly_14d;
-CREATE TABLE mimiciv_derived.sofa_hourly_14d AS
+-- Adaptations: replace charttime/wall-clock icustay_hourly with non-overlapping
+-- ICU-intime-relative 8-hour blocks spanning the complete recorded ICU stay; retain
+-- 24-hour pre-ICU context; preserve exact elapsed trailing 24-hour windows, including
+-- at a partial discharge block; retain nullable rolling components and auditable
+-- composite inputs; and require positive, at-least-one-hour vasoactive episodes.
+-- Component thresholds are unchanged.
+DROP TABLE IF EXISTS mimiciv_derived.sofa_8h_all_stay;
+CREATE TABLE mimiciv_derived.sofa_8h_all_stay AS
 WITH grid_bounds AS (
   SELECT
     subject_id,
@@ -16,22 +15,13 @@ WITH grid_bounds AS (
     stay_id,
     intime,
     outtime,
-    CASE
-      WHEN outtime IS NULL THEN 335
-      ELSE GREATEST(
-        0,
-        LEAST(
-          335,
-          TRY_CAST(CEIL(DATE_DIFF('microseconds', intime, outtime) / 3600000000.0) AS INTEGER) - 1
-        )
-      )
-    END AS last_output_hour,
-    LEAST(
-      COALESCE(outtime, intime + INTERVAL '336' HOUR),
-      intime + INTERVAL '336' HOUR
-    ) AS last_output_end
+    TRY_CAST(
+      CEIL(DATE_DIFF('microseconds', intime, outtime) / 28800000000.0)
+      AS INTEGER
+    ) - 1 AS last_output_block,
+    outtime AS last_output_end
   FROM mimiciv_icu.icustays
-  WHERE outtime IS NULL OR outtime > intime
+  WHERE outtime IS NOT NULL AND outtime > intime
 ), grid AS (
   SELECT
     gb.subject_id,
@@ -39,40 +29,39 @@ WITH grid_bounds AS (
     gb.stay_id,
     gb.intime,
     gb.outtime,
-    TRY_CAST(hour_value AS INTEGER) AS hr
+    TRY_CAST(block_value AS INTEGER) AS hr
   FROM grid_bounds gb
-  CROSS JOIN UNNEST(GENERATE_SERIES(-24, gb.last_output_hour)) AS hours(hour_value)
+  CROSS JOIN UNNEST(GENERATE_SERIES(-3, gb.last_output_block)) AS blocks(block_value)
 ), regular_co AS (
   SELECT
     subject_id,
     hadm_id,
     stay_id,
     hr,
-    intime + hr * INTERVAL '1' HOUR AS starttime,
+    intime + hr * INTERVAL '8' HOUR AS starttime,
     CASE
-      WHEN hr < 0 THEN intime + (hr + 1) * INTERVAL '1' HOUR
-      WHEN outtime IS NULL THEN intime + (hr + 1) * INTERVAL '1' HOUR
-      ELSE LEAST(intime + (hr + 1) * INTERVAL '1' HOUR, outtime)
+      WHEN hr < 0 THEN intime + (hr + 1) * INTERVAL '8' HOUR
+      ELSE LEAST(intime + (hr + 1) * INTERVAL '8' HOUR, outtime)
     END AS endtime,
     FALSE AS is_boundary,
     NULL::INTEGER AS boundary_target_hr
   FROM grid
 ), boundary_co AS (
-  -- A partial final interval shifts the true 24-hour start away from the
+  -- A partial final block shifts the true 24-hour start away from the
   -- intime-aligned internal grid. This extra interval is exactly the omitted
-  -- leading segment; its component maxima are merged only into that final row.
+  -- leading segment; its component maxima are merged only into that final block.
   SELECT
     subject_id,
     hadm_id,
     stay_id,
     -1000000 AS hr,
     last_output_end - INTERVAL '24' HOUR AS starttime,
-    intime + (last_output_hour - 23) * INTERVAL '1' HOUR AS endtime,
+    intime + (last_output_block - 2) * INTERVAL '8' HOUR AS endtime,
     TRUE AS is_boundary,
-    last_output_hour AS boundary_target_hr
+    last_output_block AS boundary_target_hr
   FROM grid_bounds
   WHERE last_output_end - INTERVAL '24' HOUR
-        < intime + (last_output_hour - 23) * INTERVAL '1' HOUR
+        < intime + (last_output_block - 2) * INTERVAL '8' HOUR
 ), co AS (
   SELECT * FROM regular_co
   UNION ALL
@@ -382,7 +371,7 @@ WITH grid_bounds AS (
   WHERE NOT is_boundary
   WINDOW w AS (
     PARTITION BY stay_id ORDER BY hr NULLS FIRST
-    ROWS BETWEEN 23 PRECEDING AND CURRENT ROW
+    ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
   )
 ), rolling AS (
   SELECT

@@ -6,7 +6,7 @@
 
 The component thresholds, arterial blood-gas rule, ventilation-at-blood-gas-time rule,
 urine-output-rate acceptance rule, and missing-as-zero total follow the pinned query.
-Five adaptations/corrections are explicit:
+Six adaptations/corrections are explicit:
 
 - The upstream wall-clock/chart-derived grid is replaced by a grid anchored exactly at raw `icustays.intime`.
 - Output is capped at ICU discharge or 336 one-hour intervals, whichever occurs first.
@@ -16,6 +16,9 @@ Five adaptations/corrections are explicit:
 - Vasoactive rates must be positive and come from a recorded episode lasting at least
   one hour. Any half-open overlap `[episode_start,episode_end)` with the current hour
   is eligible once the episode's total recorded duration is at least one hour.
+- Composite score inputs retain the intermediate values from the observation selected
+  by their hourly aggregate: GCS subscores, P/F numerator and denominator, and urine
+  volume and effective duration.
 
 This is an ICU-relative adaptation of the pinned MIT-LCP hourly SOFA implementation, not an independently validated clinical software product.
 
@@ -58,7 +61,7 @@ dependencies, changed hashes, or a changed recursive graph.
 ## Outputs and missingness
 
 `scores.parquet` has primary key `(stay_id, hour_index)` and deterministic ordering.
-Version 2 outputs report `adaptation_version='sofa-hourly-14d-v2'`. Key columns are:
+Version 3 outputs report `adaptation_version='sofa-hourly-14d-v3'`. Key columns are:
 
 - `hour_start`, `hour_end`: current interval.
 - `trailing_window_start`, `trailing_window_end`: effective component window.
@@ -67,6 +70,24 @@ Version 2 outputs report `adaptation_version='sofa-hourly-14d-v2'`. Key columns 
 - `<component>_24hours_raw`: nullable rolling maximum before zero filling.
 - `<component>`: raw score from the current one-hour interval.
 - Supporting extrema/rates such as P/F ratios, MAP, GCS, creatinine and vasopressor rates.
+- `gcs_motor`, `gcs_verbal`, `gcs_eyes`: canonical MIMIC GCS components associated
+  with `gcs_min`; `gcs_charttime`, `gcs_unable`, and `gcs_components_measured` describe
+  that same selected observation. These component names correspond to GCM, GCV, and GCE.
+- `pao2_{novent,vent}`, `fio2_{novent,vent}`, and `fio2_source_{novent,vent}`:
+  numerator, effective denominator (percent), and denominator source associated with
+  each minimum P/F ratio; the corresponding `pao2fio2ratio_*_charttime` identifies the gas.
+- `urineoutput_24hr`, `uo_tm_24hr`, and `uo_24hr_charttime`: source volume, effective
+  duration, and observation time associated with `uo_24hr`, where
+  `uo_24hr = urineoutput_24hr / uo_tm_24hr * 24`.
+
+All supporting observations above are selected within the current one-hour interval,
+matching the existing `gcs_min`, P/F-ratio, and `uo_24hr` columns. The rolling organ
+scores remain in the `*_24hours[_raw]` columns.
+
+The pinned MIMIC GCS reconstruction can use normal defaults for unrecorded components
+and has special handling for an endotracheal-tube verbal response. Consequently,
+`gcs_motor + gcs_verbal + gcs_eyes` need not equal `gcs_min`; use `gcs_unable` and
+`gcs_components_measured` to distinguish these cases. No new GCS imputation is added.
 
 `score_missingness.parquet` has one row per stay-hour. Missingness means no qualifying value for that component in its trailing component window, not merely no value in the current hour. The total is non-null because the pinned SQL treats unavailable components as zero; it does not prove complete observation. No further imputation is performed.
 

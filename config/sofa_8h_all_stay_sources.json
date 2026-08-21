@@ -1,0 +1,46 @@
+{
+  "score": "Complete-stay ICU-relative SOFA in eight-hour blocks",
+  "adaptation_version": "sofa-8h-all-stay-v1",
+  "mimic_code": {
+    "repository": "https://github.com/MIT-LCP/mimic-code.git",
+    "release": "v3.0.1",
+    "commit": "c7e07560dc847e32cbb0b2890213e8e7cbd8bc7e"
+  },
+  "official_hourly_sofa": {
+    "path": "mimic-iv/concepts_duckdb/score/sofa.sql",
+    "sha256": "5af9c75bdaeb9342138a0fbc8cbef33b132508689e3ac492ab574af1c7ff05b0"
+  },
+  "adaptations": [
+    {
+      "id": "eight-hour-icu-relative-grid",
+      "description": "Uses non-overlapping eight-hour intervals anchored exactly at raw icustays.intime; block 0 is (intime,intime+8h], with a final partial block ending at outtime."
+    },
+    {
+      "id": "complete-recorded-stay",
+      "description": "Emits every block through raw ICU outtime without a day cap. Stays with null or nonpositive outtime are excluded because a complete-stay endpoint cannot be established."
+    },
+    {
+      "id": "exact-trailing-window",
+      "description": "Computes standard SOFA from the worst component values in the exact chronological interval (block_end-24h,block_end], including the omitted leading segment for a partial discharge block."
+    },
+    {
+      "id": "explicit-component-missingness",
+      "description": "Retains nullable rolling component scores in *_24hours_raw while preserving upstream COALESCE(component,0) behavior in the reported components and total."
+    },
+    {
+      "id": "vasoactive-duration-correction",
+      "description": "Scores only positive vasoactive rates from recorded episodes lasting at least one hour and overlapping a block."
+    },
+    {
+      "id": "composite-input-audit-columns",
+      "description": "Retains GCS components, PaO2 and effective FiO2, and urine volume and duration from the observation selected within each current eight-hour block."
+    }
+  ],
+  "preserved_upstream_behavior": [
+    "The reported SOFA at each block end uses a trailing 24-hour component window, not only the current eight-hour block.",
+    "Event intervals use starttime < charttime and endtime >= charttime.",
+    "Urine output accepts a urine-output-rate window only when uo_tm_24hr is between 22 and 30 hours and scales it to 24 hours.",
+    "Arterial blood gases only are used for respiratory SOFA and ventilation status is evaluated at blood-gas charttime.",
+    "Missing rolling components contribute zero to sofa_trailing_24h; missingness is exported separately."
+  ]
+}

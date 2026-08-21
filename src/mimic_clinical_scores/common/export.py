@@ -29,6 +29,12 @@ class ExportError(RuntimeError):
     """Raised when outputs would be ambiguous or fail validation."""
 
 
+def _is_longitudinal(specification: ScoreSpecification) -> bool:
+    return getattr(specification, "output_granularity", "stay") in {
+        "stay_hour", "stay_block"
+    }
+
+
 def _literal(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
 
@@ -149,7 +155,7 @@ def calculate_coverage(
     )
     matched = int(connection.execute("SELECT COUNT(*) FROM mimiciv_icu.icustays").fetchone()[0])
     overall = one()
-    if getattr(specification, "output_granularity", "stay") == "stay_hour":
+    if _is_longitudinal(specification):
         overall["score_rows"] = overall.pop("cohort_rows")
         overall["cohort_stays"] = total_cohort
         overall["scored_stays"] = int(
@@ -166,7 +172,7 @@ def calculate_coverage(
         "at_least_24h": one("short IS FALSE"),
         "unknown_length": one("short IS NULL"),
     }
-    if getattr(specification, "output_granularity", "stay") == "stay_hour":
+    if _is_longitudinal(specification):
         for metrics in stratified.values():
             metrics["score_rows"] = metrics.pop("cohort_rows")
     overall.update(
@@ -191,7 +197,7 @@ def component_missingness_rows(
     }
     denominator_field = (
         "row_count"
-        if getattr(specification, "output_granularity", "stay") == "stay_hour"
+        if _is_longitudinal(specification)
         else "cohort_size"
     )
     rows: list[dict[str, Any]] = []
@@ -269,7 +275,7 @@ def export_all(
             "component", "short_stay_stratum",
             (
                 "row_count"
-                if getattr(specification, "output_granularity", "stay") == "stay_hour"
+                if _is_longitudinal(specification)
                 else "cohort_size"
             ),
             "observed_count",
@@ -410,7 +416,7 @@ def _validate_parquet_projection(
         raise ExportError(f"{label} differs from its declared projection in {mismatch} rows")
 
 
-def _validate_hourly_timestamps(
+def _validate_longitudinal_timestamps(
     connection: duckdb.DuckDBPyConnection,
     *,
     scores_path: Path,
@@ -453,6 +459,37 @@ def _validate_hourly_timestamps(
                 """
             ).fetchone()[0]
         )
+    elif specification.name == "sofa_8h_all_stay":
+        invalid = int(
+            connection.execute(
+                f"""
+                SELECT COUNT(*) FROM read_parquet({path})
+                WHERE block_start IS DISTINCT FROM
+                        intime + block_index * INTERVAL '8' HOUR
+                   OR block_end IS DISTINCT FROM LEAST(
+                        intime + (block_index + 1) * INTERVAL '8' HOUR, outtime
+                      )
+                   OR block_end <= block_start
+                   OR block_duration_hours IS DISTINCT FROM
+                        DATE_DIFF(
+                          'microseconds', block_start, block_end
+                        ) / 3600000000.0
+                   OR trailing_window_end IS DISTINCT FROM block_end
+                   OR trailing_window_start IS DISTINCT FROM block_end - INTERVAL '24' HOUR
+                """
+            ).fetchone()[0]
+        )
+        expected_rows = int(
+            connection.execute(
+                """
+                SELECT COALESCE(SUM(TRY_CAST(CEIL(
+                  DATE_DIFF('microseconds', intime, outtime) / 28800000000.0
+                ) AS INTEGER)), 0)
+                FROM mimiciv_icu.icustays
+                WHERE outtime IS NOT NULL AND outtime > intime
+                """
+            ).fetchone()[0]
+        )
     elif specification.name == "sofa_hourly_reverse_7d":
         invalid = int(
             connection.execute(
@@ -486,11 +523,13 @@ def _validate_hourly_timestamps(
     else:
         return
     if invalid:
-        raise ExportError(f"Invalid hourly timestamps or trailing windows in {invalid} rows")
+        raise ExportError(
+            f"Invalid longitudinal timestamps or trailing windows in {invalid} rows"
+        )
     observed_rows = int(pq.read_metadata(scores_path).num_rows)
     if observed_rows != expected_rows:
         raise ExportError(
-            f"Hourly row count differs from duration-derived expectation: "
+            f"Longitudinal row count differs from duration-derived expectation: "
             f"observed={observed_rows}, expected={expected_rows}"
         )
 
@@ -530,21 +569,29 @@ def validate_exports(
     missingness_path = output_directory / "score_missingness.parquet"
     cohort_rows = int(connection.execute("SELECT COUNT(*) FROM pipeline_meta.cohort").fetchone()[0])
     expected_rows = int(connection.execute(f"SELECT COUNT(*) FROM {specification.score_table}").fetchone()[0])
-    hourly = getattr(specification, "output_granularity", "stay") == "stay_hour"
+    longitudinal = _is_longitudinal(specification)
     if pq.read_metadata(scores_path).num_rows != expected_rows:
-        expected_description = "the hourly score table" if hourly else "one row per cohort stay"
+        expected_description = (
+            "the longitudinal score table" if longitudinal else "one row per cohort stay"
+        )
         raise ExportError(f"scores.parquet does not match {expected_description}")
     if pq.read_metadata(missingness_path).num_rows != expected_rows:
         raise ExportError("score_missingness.parquet row count differs from scores.parquet")
 
     exported_hour_column = None
-    if hourly:
+    if longitudinal:
         exported_score_columns = tuple(pq.read_schema(scores_path).names)
-        exported_hour_column = (
-            "hour_index"
-            if "hour_index" in exported_score_columns
-            else "hours_before_discharge"
-        )
+        exported_hour_column = getattr(specification, "hour_index_column", None)
+        if exported_hour_column is None:
+            exported_hour_column = (
+                "hour_index"
+                if "hour_index" in exported_score_columns
+                else "hours_before_discharge"
+            )
+        if exported_hour_column not in exported_score_columns:
+            raise ExportError(
+                f"Longitudinal index {exported_hour_column!r} is missing from scores.parquet"
+            )
     parquet_key = ("stay_id",) + ((exported_hour_column,) if exported_hour_column else ())
     _validate_parquet_projection(
         connection,
@@ -561,9 +608,9 @@ def validate_exports(
         key_columns=parquet_key,
     )
 
-    if hourly:
+    if longitudinal:
         hour_column = str(exported_hour_column)
-        maximum_hour = int(getattr(specification, "maximum_hour_index", 335))
+        maximum_hour = getattr(specification, "maximum_hour_index", 335)
         eligible_stays = int(
             connection.execute(
                 "SELECT COUNT(*) FROM mimiciv_icu.icustays WHERE "
@@ -583,7 +630,10 @@ def validate_exports(
             """
         ).fetchone()
         if score_counts != (expected_rows, eligible_stays, 0, 0):
-            raise ExportError(f"Invalid hourly score identifiers: {score_counts}")
+            raise ExportError(f"Invalid longitudinal score identifiers: {score_counts}")
+        maximum_predicate = (
+            f" OR max_hr > {int(maximum_hour)}" if maximum_hour is not None else ""
+        )
         invalid_grid = connection.execute(
             f"""
             SELECT COUNT(*) FROM (
@@ -591,13 +641,15 @@ def validate_exports(
                      COUNT(*) AS rows
               FROM read_parquet({_literal(str(scores_path.resolve()))})
               GROUP BY stay_id
-              HAVING min_hr <> 0 OR max_hr > {maximum_hour} OR rows <> max_hr + 1
+              HAVING min_hr <> 0{maximum_predicate} OR rows <> max_hr + 1
             ) invalid
             """
         ).fetchone()[0]
         if invalid_grid:
-            raise ExportError(f"Invalid or non-contiguous hourly grids for {invalid_grid} stays")
-        _validate_hourly_timestamps(
+            raise ExportError(
+                f"Invalid or non-contiguous longitudinal grids for {invalid_grid} stays"
+            )
+        _validate_longitudinal_timestamps(
             connection, scores_path=scores_path, specification=specification
         )
     else:
@@ -611,11 +663,11 @@ def validate_exports(
             raise ExportError(f"Invalid score identifiers: {score_counts}")
     expected_stay_query = (
         "SELECT stay_id FROM mimiciv_icu.icustays WHERE outtime IS NOT NULL AND outtime > intime"
-        if hourly and getattr(specification, "requires_outtime", False)
+        if longitudinal and getattr(specification, "requires_outtime", False)
         else (
             "SELECT stay_id FROM mimiciv_icu.icustays "
             "WHERE outtime IS NULL OR outtime > intime"
-            if hourly
+            if longitudinal
             else "SELECT stay_id FROM pipeline_meta.cohort"
         )
     )
@@ -708,7 +760,7 @@ def validate_exports(
     if insecure:
         raise ExportError("Output files are not protected with owner-only permissions: " + ", ".join(insecure))
     result = {"valid": True, "cohort_rows": cohort_rows, "checked_outputs": list(required)}
-    if hourly:
+    if longitudinal:
         result["score_rows"] = expected_rows
         if getattr(specification, "requires_outtime", False):
             result["scored_stays"] = eligible_stays
@@ -716,7 +768,12 @@ def validate_exports(
         maximum_observed = connection.execute(
             f"SELECT MAX({hour_column}) FROM read_parquet({_literal(str(scores_path.resolve()))})"
         ).fetchone()[0]
-        result["maximum_hour_index"] = (
+        maximum_index_key = (
+            "maximum_block_index"
+            if getattr(specification, "output_granularity", "stay") == "stay_block"
+            else "maximum_hour_index"
+        )
+        result[maximum_index_key] = (
             int(maximum_observed) if maximum_observed is not None else None
         )
     return result

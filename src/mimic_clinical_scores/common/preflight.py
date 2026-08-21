@@ -89,7 +89,8 @@ def run_preflight(
                 f"manifest={sorted(declared_ids)}"
             )
     elif specification.name in {
-        "sofa_first_day_adapted", "sofa_hourly_14d", "sofa_hourly_reverse_7d"
+        "sofa_first_day_adapted", "sofa_8h_all_stay", "sofa_hourly_14d",
+        "sofa_hourly_reverse_7d"
     }:
         from mimic_clinical_scores.common.provenance import extract_item_ids, extract_table_references
 
@@ -98,6 +99,11 @@ def run_preflight(
             source_filename = "sofa_sources.json"
             expected_upstream_key = "official_first_day_sofa"
             expected_upstream_hash = "02736bd4faf9885fed67de777ec85852b50e93ac1ddc03bd6e5039216ce3d86e"
+        elif specification.name == "sofa_8h_all_stay":
+            from mimic_clinical_scores.scores.sofa_8h_all_stay.specification import load_itemid_manifest as load_sofa_items
+            source_filename = "sofa_8h_all_stay_sources.json"
+            expected_upstream_key = "official_hourly_sofa"
+            expected_upstream_hash = "5af9c75bdaeb9342138a0fbc8cbef33b132508689e3ac492ab574af1c7ff05b0"
         elif specification.name == "sofa_hourly_14d":
             from mimic_clinical_scores.scores.sofa_hourly_14d.specification import load_itemid_manifest as load_sofa_items
             source_filename = "sofa_hourly_14d_sources.json"

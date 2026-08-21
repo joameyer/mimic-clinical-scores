@@ -91,7 +91,8 @@ class SOFAHourly14dSpecification:
     score_table: str = "mimiciv_derived.sofa_hourly_14d"
     provenance_label: str = (
         "MIT-LCP mimic-code v3.0.1 hourly SOFA adapted to an ICU-intime-relative "
-        "grid with exact elapsed 24-hour windows and at-least-one-hour vasoactive episodes"
+        "grid with exact elapsed 24-hour windows, at-least-one-hour vasoactive episodes, "
+        "and auditable composite inputs"
     )
     item_manifest_version: str = "sofa-hourly-14d-v2"
     output_granularity: str = "stay_hour"

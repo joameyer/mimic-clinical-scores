@@ -221,6 +221,7 @@ _RULES_BY_SCORE = {
     "saps_ii": _SAPS_II_RULES,
     "saps_iii_adapted": _SAPS_III_RULES,
     "sofa_first_day_adapted": _SOFA_RULES,
+    "sofa_8h_all_stay": _SOFA_RULES,
     "sofa_hourly_14d": _SOFA_RULES,
     "sofa_hourly_reverse_7d": _SOFA_RULES,
 }

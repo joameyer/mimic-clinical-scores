@@ -33,6 +33,7 @@ where = ["src"]
 "mimic_clinical_scores.scores.saps_ii" = ["*.json"]
 "mimic_clinical_scores.scores.saps_iii_adapted" = ["*.json", "*.sql"]
 "mimic_clinical_scores.scores.sofa_first_day_adapted" = ["*.json", "*.sql"]
+"mimic_clinical_scores.scores.sofa_8h_all_stay" = ["*.sql"]
 "mimic_clinical_scores.scores.sofa_hourly_14d" = ["*.json", "*.sql"]
 "mimic_clinical_scores.scores.sofa_hourly_reverse_7d" = ["*.json", "*.sql"]
 

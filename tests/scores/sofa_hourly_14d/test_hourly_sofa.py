@@ -97,7 +97,13 @@ def test_hourly_filtered_staging_matches_unfiltered_and_grid_is_bounded(
     columns = (
         "stay_id,hr,starttime,endtime,sofa_24hours,"
         "respiration_24hours_raw,coagulation_24hours_raw,liver_24hours_raw,"
-        "cardiovascular_24hours_raw,cns_24hours_raw,renal_24hours_raw"
+        "cardiovascular_24hours_raw,cns_24hours_raw,renal_24hours_raw,"
+        "pao2fio2ratio_novent,pao2fio2ratio_novent_charttime,pao2_novent,"
+        "fio2_novent,fio2_source_novent,pao2fio2ratio_vent,"
+        "pao2fio2ratio_vent_charttime,pao2_vent,fio2_vent,fio2_source_vent,"
+        "gcs_min,gcs_charttime,gcs_motor,gcs_verbal,gcs_eyes,gcs_unable,"
+        "gcs_components_measured,uo_24hr,uo_24hr_charttime,urineoutput_24hr,"
+        "uo_tm_24hr"
     )
     expected = reference.execute(
         f"SELECT {columns} FROM mimiciv_derived.sofa_hourly_14d "
@@ -190,10 +196,16 @@ def test_intime_relative_partial_discharge_has_exact_elapsed_window(project_root
         "(3,30,102,TIMESTAMP '2100-01-01 00:00:00',TIMESTAMP '2100-01-01 02:00:00')"
     )
     definitions = {
-        "bg": "subject_id INTEGER,charttime TIMESTAMP,pao2fio2ratio DOUBLE,specimen VARCHAR",
+        "bg": (
+            "subject_id INTEGER,charttime TIMESTAMP,po2 DOUBLE,fio2 DOUBLE,"
+            "fio2_chartevents DOUBLE,pao2fio2ratio DOUBLE,specimen VARCHAR"
+        ),
         "ventilation": "stay_id INTEGER,starttime TIMESTAMP,endtime TIMESTAMP,ventilation_status VARCHAR",
         "vitalsign": "stay_id INTEGER,charttime TIMESTAMP,mbp DOUBLE",
-        "gcs": "stay_id INTEGER,charttime TIMESTAMP,gcs DOUBLE",
+        "gcs": (
+            "stay_id INTEGER,charttime TIMESTAMP,gcs DOUBLE,gcs_motor DOUBLE,"
+            "gcs_verbal DOUBLE,gcs_eyes DOUBLE,gcs_unable INTEGER"
+        ),
         "enzyme": "hadm_id INTEGER,charttime TIMESTAMP,bilirubin_total DOUBLE",
         "chemistry": "hadm_id INTEGER,charttime TIMESTAMP,creatinine DOUBLE",
         "complete_blood_count": "hadm_id INTEGER,charttime TIMESTAMP,platelet DOUBLE",
@@ -262,6 +274,109 @@ def test_intime_relative_partial_discharge_has_exact_elapsed_window(project_root
     assert dict(zip(projection_names, projection))["trailing_window_start"] == datetime(
         2099, 12, 31, 2, 15
     )
+    con.close()
+
+
+def test_composite_inputs_retain_the_intermediates_from_selected_observations(
+    project_root,
+) -> None:
+    con = duckdb.connect()
+    con.execute("CREATE SCHEMA mimiciv_icu; CREATE SCHEMA mimiciv_derived")
+    con.execute(
+        "CREATE TABLE mimiciv_icu.icustays(subject_id INTEGER,hadm_id INTEGER,"
+        "stay_id INTEGER,intime TIMESTAMP,outtime TIMESTAMP)"
+    )
+    con.execute(
+        "INSERT INTO mimiciv_icu.icustays VALUES "
+        "(1,10,100,TIMESTAMP '2100-01-01 00:00:00',TIMESTAMP '2100-01-01 01:00:00')"
+    )
+    definitions = {
+        "bg": (
+            "subject_id INTEGER,charttime TIMESTAMP,po2 DOUBLE,fio2 DOUBLE,"
+            "fio2_chartevents DOUBLE,pao2fio2ratio DOUBLE,specimen VARCHAR"
+        ),
+        "ventilation": (
+            "stay_id INTEGER,starttime TIMESTAMP,endtime TIMESTAMP,"
+            "ventilation_status VARCHAR"
+        ),
+        "vitalsign": "stay_id INTEGER,charttime TIMESTAMP,mbp DOUBLE",
+        "gcs": (
+            "stay_id INTEGER,charttime TIMESTAMP,gcs DOUBLE,gcs_motor DOUBLE,"
+            "gcs_verbal DOUBLE,gcs_eyes DOUBLE,gcs_unable INTEGER"
+        ),
+        "enzyme": "hadm_id INTEGER,charttime TIMESTAMP,bilirubin_total DOUBLE",
+        "chemistry": "hadm_id INTEGER,charttime TIMESTAMP,creatinine DOUBLE",
+        "complete_blood_count": "hadm_id INTEGER,charttime TIMESTAMP,platelet DOUBLE",
+        "urine_output_rate": (
+            "stay_id INTEGER,charttime TIMESTAMP,uo_tm_24hr DOUBLE,"
+            "urineoutput_24hr DOUBLE"
+        ),
+        "epinephrine": (
+            "stay_id INTEGER,starttime TIMESTAMP,endtime TIMESTAMP,vaso_rate DOUBLE"
+        ),
+        "norepinephrine": (
+            "stay_id INTEGER,starttime TIMESTAMP,endtime TIMESTAMP,vaso_rate DOUBLE"
+        ),
+        "dopamine": (
+            "stay_id INTEGER,starttime TIMESTAMP,endtime TIMESTAMP,vaso_rate DOUBLE"
+        ),
+        "dobutamine": (
+            "stay_id INTEGER,starttime TIMESTAMP,endtime TIMESTAMP,vaso_rate DOUBLE"
+        ),
+    }
+    for table, columns in definitions.items():
+        con.execute(f"CREATE TABLE mimiciv_derived.{table}({columns})")
+
+    con.execute(
+        "INSERT INTO mimiciv_derived.bg VALUES "
+        "(1,TIMESTAMP '2100-01-01 00:06:00',80,40,50,200,'ART.'),"
+        "(1,TIMESTAMP '2100-01-01 00:12:00',60,NULL,60,100,'ART.'),"
+        "(1,TIMESTAMP '2100-01-01 00:18:00',40,50,60,80,'ART.')"
+    )
+    con.execute(
+        "INSERT INTO mimiciv_derived.ventilation VALUES "
+        "(100,TIMESTAMP '2100-01-01 00:10:00',TIMESTAMP '2100-01-01 00:20:00',"
+        "'InvasiveVent')"
+    )
+    con.execute(
+        "INSERT INTO mimiciv_derived.gcs VALUES "
+        "(100,TIMESTAMP '2100-01-01 00:06:00',11,5,3,3,0),"
+        "(100,TIMESTAMP '2100-01-01 00:12:00',7,4,2,1,0)"
+    )
+    con.execute(
+        "INSERT INTO mimiciv_derived.urine_output_rate VALUES "
+        "(100,TIMESTAMP '2100-01-01 00:06:00',23,230),"
+        "(100,TIMESTAMP '2100-01-01 00:12:00',24,480)"
+    )
+
+    execute_untracked(
+        con,
+        concepts=(SOFA_HOURLY_14D_SPEC.score_concept,),
+        vendor_root=SOFA_HOURLY_14D_SPEC.score_vendor_root(project_root),
+    )
+    values = con.execute(
+        "SELECT pao2fio2ratio_novent,pao2fio2ratio_novent_charttime,"
+        "pao2_novent,fio2_novent,fio2_source_novent,"
+        "pao2fio2ratio_vent,pao2fio2ratio_vent_charttime,"
+        "pao2_vent,fio2_vent,fio2_source_vent,"
+        "gcs_min,gcs_charttime,gcs_motor,gcs_verbal,gcs_eyes,gcs_unable,"
+        "gcs_components_measured,uo_24hr,uo_24hr_charttime,"
+        "urineoutput_24hr,uo_tm_24hr "
+        "FROM mimiciv_derived.sofa_hourly_14d WHERE stay_id=100 AND hr=0"
+    ).fetchone()
+    assert values == (
+        200.0, datetime(2100, 1, 1, 0, 6), 80.0, 40.0, "labevents",
+        80.0, datetime(2100, 1, 1, 0, 18), 40.0, 50.0, "labevents",
+        7.0, datetime(2100, 1, 1, 0, 12), 4.0, 2.0, 1.0, 0, 3,
+        480.0, datetime(2100, 1, 1, 0, 12), 480.0, 24.0,
+    )
+    projection = con.execute(SOFA_HOURLY_14D_SPEC.scores_projection_sql()).fetchone()
+    projection_names = [column[0] for column in con.description]
+    projected = dict(zip(projection_names, projection))
+    assert projected["gcs_motor"] == 4.0
+    assert projected["pao2_vent"] == 40.0
+    assert projected["urineoutput_24hr"] == 480.0
+    assert projected["adaptation_version"] == "sofa-hourly-14d-v3"
     con.close()
 
 

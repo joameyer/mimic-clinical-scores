@@ -4,8 +4,9 @@ This project computes clinical severity scores from raw MIMIC-IV with a protecte
 stay-ID allowlist, filtered DuckDB staging, immutable official SQL, resumable state,
 and auditable exports. It implements official MIT-LCP SAPS II, an explicitly named
 MIMIC-IV adaptation of SAPS III, a documented arterial first-day SOFA adaptation, an
-ICU-relative hourly SOFA trajectory through day 14, and a discharge-relative hourly
-SOFA trajectory over the final seven days. APS III and SOFA-2 are not implemented.
+ICU-relative hourly SOFA trajectory through day 14, a complete-stay SOFA trajectory
+sampled in eight-hour blocks, and a discharge-relative hourly SOFA trajectory over the
+final seven days. APS III and SOFA-2 are not implemented.
 
 The default operational workflow is the 100-stay HPC integration run. Local work is
 limited to metadata-only preflight, cohort sampling, and synthetic/demo tests. Never
@@ -54,6 +55,11 @@ src/mimic_clinical_scores/
     scoring.py         stay-hour score and missingness projections
     itemid_manifest.v1.json  preserved historical provenance
     itemid_manifest.v2.json
+  scores/sofa_8h_all_stay/
+    specification.py   complete-stay block dependencies and eligibility
+    staging_rules.py   full-stay and nested lookback retention
+    sofa_8h_all_stay.sql
+    scoring.py         stay-block score and missingness projections
   scores/sofa_hourly_reverse_7d/
     specification.py   discharge-relative dependencies and eligibility
     staging_rules.py   final-seven-day and nested lookback retention
@@ -70,7 +76,8 @@ rules, and score documentation. A future score supplies the small `ScoreSpecific
 contract and its own staging declaration; it does not reimplement the shared pipeline.
 Select it with `--score saps_ii` (the backward-compatible default),
 `--score saps_iii_adapted`, `--score sofa_first_day_adapted`,
-`--score sofa_hourly_14d`, or `--score sofa_hourly_reverse_7d`.
+`--score sofa_hourly_14d`, `--score sofa_8h_all_stay`, or
+`--score sofa_hourly_reverse_7d`.
 
 After staging, every production path performs a fail-closed audit of score-driving
 `valueuom` and `rateuom` fields. Missing physical or dimensionally incompatible units
@@ -90,6 +97,11 @@ pre-ICU context is not exported. Vasoactive rates must be positive and come from
 episode lasting at least one hour. Nullable rolling components are kept alongside the
 zero-filled total so missingness remains visible. See the
 [hourly SOFA audit and deployment guide](docs/scores/sofa_hourly_14d.md).
+
+`sofa_8h_all_stay` emits standard trailing 24-hour SOFA at the end of each
+ICU-intime-relative eight-hour block across the complete recorded stay, without a day
+cap. The final block ends exactly at discharge and can be partial. See the
+[complete-stay eight-hour SOFA guide](docs/scores/sofa_8h_all_stay.md).
 
 `sofa_hourly_reverse_7d` is independently aligned to ICU discharge: index 0 is the
 final hour and indices increase backward through at most seven days. It includes both
@@ -296,7 +308,8 @@ score or scan complete event contents:
 file only to hash bytes, still without parsing or scoring clinical values.
 
 For another score, add `--score saps_iii_adapted`,
-`--score sofa_first_day_adapted`, `--score sofa_hourly_14d`, or
+`--score sofa_first_day_adapted`, `--score sofa_hourly_14d`,
+`--score sofa_8h_all_stay`, or
 `--score sofa_hourly_reverse_7d`. The SOFA variants
 validate five raw files, the pinned
 MIT-LCP SQL subset, adaptation manifest, project SQL, and item-ID audit without

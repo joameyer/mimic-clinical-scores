@@ -18,6 +18,9 @@ from mimic_clinical_scores.scores.saps_iii_adapted.specification import (
 from mimic_clinical_scores.scores.sofa_first_day_adapted.specification import (
     SOFA_FIRST_DAY_ADAPTED_SPEC,
 )
+from mimic_clinical_scores.scores.sofa_8h_all_stay.specification import (
+    SOFA_8H_ALL_STAY_SPEC,
+)
 from mimic_clinical_scores.scores.sofa_hourly_14d.specification import SOFA_HOURLY_14D_SPEC
 from mimic_clinical_scores.scores.sofa_hourly_reverse_7d.specification import (
     SOFA_HOURLY_REVERSE_7D_SPEC,
@@ -56,12 +59,14 @@ def test_all_scores_declare_units_for_their_quantitative_inputs() -> None:
     assert len(unit_rules_for(SAPSII_SPEC)) == 16
     assert len(unit_rules_for(SAPSIII_ADAPTED_SPEC)) == 17
     assert len(unit_rules_for(SOFA_FIRST_DAY_ADAPTED_SPEC)) == 14
+    assert len(unit_rules_for(SOFA_8H_ALL_STAY_SPEC)) == 14
     assert len(unit_rules_for(SOFA_HOURLY_14D_SPEC)) == 14
     assert len(unit_rules_for(SOFA_HOURLY_REVERSE_7D_SPEC)) == 14
     specifications = (
         SAPSII_SPEC,
         SAPSIII_ADAPTED_SPEC,
         SOFA_FIRST_DAY_ADAPTED_SPEC,
+        SOFA_8H_ALL_STAY_SPEC,
         SOFA_HOURLY_14D_SPEC,
         SOFA_HOURLY_REVERSE_7D_SPEC,
     )
@@ -113,6 +118,7 @@ def test_all_scores_declare_units_for_their_quantitative_inputs() -> None:
         },
     }
     expected["sofa_hourly_14d"] = expected["sofa_first_day_adapted"]
+    expected["sofa_8h_all_stay"] = expected["sofa_first_day_adapted"]
     expected["sofa_hourly_reverse_7d"] = expected["sofa_first_day_adapted"]
     for specification in specifications:
         actual: dict[str, set[int]] = {}
